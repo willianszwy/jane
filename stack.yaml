@@ -1,0 +1,9 @@
+flags: {}
+packages:
+- .
+extra-deps:
+- github: idontgetoutmuch/binary-low-level
+  commit: aab39ed29dfa8e25a9ece184612ffa22a99bce98
+- git: https://github.com/WhoMeNope/haskell-ncurses.git
+  commit: 3111b82543b435d91631c7e800e742cdadf27383
+resolver: lts-12.24
