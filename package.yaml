@@ -38,6 +38,7 @@ executables:
     - binary-strict
     - bytestring
     - ncurses
+    - mtl
 
 tests:
   jane-test:

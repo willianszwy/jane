@@ -59,7 +59,7 @@ parserINesHeader = do
         Left  error -> fail error
         Right x     -> return x
 
-parseRom :: B.ByteString -> Either String INes
+parseRom :: B.ByteString -> IO INes
 parseRom input = case fst $ (G.runGet parserINesHeader input) of
     Left  error -> fail error
     Right x     -> return x
