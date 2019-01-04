@@ -1,31 +1,32 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module Cpu where 
     
     import Data.Word
     import Flags as F
 
-    newtype A = A Word8 
-        deriving (Show)
+    data Cpu = Cpu { accumulator :: Word8 ,
+                     indexX :: Word8 ,
+                     indexY :: Word8 ,
+                     programCounter :: Word16 ,
+                     stackPointer :: Word8,
+                     processorStatus :: Flags
+                     } deriving (Show)
 
-    newtype X = X Word8 
-        deriving (Show)
 
-    newtype Y = Y Word8 
-        deriving (Show)
+    empty :: Cpu
+    empty = Cpu { accumulator = 0,
+                  indexX = 0,
+                  indexY = 0,
+                  programCounter = 0,
+                  stackPointer = 0,
+                  processorStatus = F.empty
+                }
 
-    newtype PC = PC Word16 
-        deriving (Show)
 
-    newtype SP = SP Word8  
-        deriving (Show)
-
-    newtype PS = PS Flags
-        deriving (Show)
-
-    data Cpu = Cpu A X Y PC SP PS
-           deriving (Show)
-
-    showFlags :: Cpu -> IO ()
-    showFlags (Cpu _ _ _ _ _ (PS f)) = putStrLn $ F.printFlags f
+    showFlags :: Cpu -> String
+    showFlags Cpu {processorStatus} = F.printFlags processorStatus
 
     setFlags :: Cpu -> Flags -> Cpu
-    setFlags (Cpu (A a) (X x) (Y y) (PC pc) (SP sp) _ ) flags = Cpu (A a) (X x) (Y y) (PC pc) (SP sp) (PS flags)
+    setFlags cpu flags = cpu {processorStatus=flags}
