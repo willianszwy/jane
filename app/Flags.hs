@@ -1,56 +1,51 @@
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE RecordWildCards #-}
 module Flags where
 import           Data.Word
 import           Data.Bits
 
-type Flags = Word8
+data Flags = Flags { 
+                     negative :: Bool,
+                     overflow :: Bool,
+                     break :: Bool,
+                     decimal :: Bool,
+                     interrupt :: Bool,
+                     zero :: Bool,
+                     carry :: Bool
+                   } deriving (Show)
 
 empty :: Flags
-empty = setBit zeroBits 5
+empty = Flags { 
+    negative = False,
+    overflow = False,
+    break = False,
+    decimal = False,
+    interrupt = False,
+    zero = False,
+    carry = False
+  } 
 
+compact :: Flags -> Word8
+compact flags = 
+    let f = setBit 0 5 in
+    isNegative . isOverflow . isBreak . isDecimal . isInterrupt . isZero . isCarry $ f
+    where 
+        isNegative w  = if negative flags then setBit w 7 else clearBit w 7
+        isOverflow w  = if overflow flags then setBit w 6 else clearBit w 6
+        isBreak w     = if Flags.break flags then setBit w 4 else clearBit w 4
+        isDecimal w   = if decimal flags then setBit w 3 else clearBit w 3
+        isInterrupt w = if interrupt flags then setBit w 2 else clearBit w 2
+        isZero w      = if zero flags then setBit w 1 else clearBit w 1
+        isCarry w     = if carry flags then setBit w 0 else clearBit w 0
 
-data Flag = Negative | Overflow | Check | Break | Decimal | Interrupt | Zero | Carry deriving (Eq, Show)
-
-
-setFlag :: Flags -> Flag -> Flags
-setFlag flags Carry     = setBit flags 0
-setFlag flags Zero      = setBit flags 1
-setFlag flags Interrupt = setBit flags 2
-setFlag flags Decimal   = setBit flags 3
-setFlag flags Break     = setBit flags 4
-setFlag flags Overflow  = setBit flags 6
-setFlag flags Negative  = setBit flags 7
-
-
-clearFlag :: Flags -> Flag -> Flags
-clearFlag flags Carry     = clearBit flags 0
-clearFlag flags Zero      = clearBit flags 1
-clearFlag flags Interrupt = clearBit flags 2
-clearFlag flags Decimal   = clearBit flags 3
-clearFlag flags Break     = clearBit flags 4
-clearFlag flags Overflow  = clearBit flags 6
-clearFlag flags Negative  = clearBit flags 7
-
-
-testFlag :: Flags -> Flag -> Bool
-testFlag flags Carry     = testBit flags 0
-testFlag flags Zero      = testBit flags 1
-testFlag flags Interrupt = testBit flags 2
-testFlag flags Decimal   = testBit flags 3
-testFlag flags Break     = testBit flags 4
-testFlag flags Check     = testBit flags 5
-testFlag flags Overflow  = testBit flags 6
-testFlag flags Negative  = testBit flags 7
-
-
-printFlags :: Flags -> String
-printFlags flags =
-    let c = " | C: " ++ testFlag' Carry
-        z = " | Z: " ++ testFlag' Zero
-        i = " | I: " ++ testFlag' Interrupt
-        d = " | D: " ++ testFlag' Decimal
-        b = " | B: " ++ testFlag' Break
-        x = " | -: " ++ testFlag' Check
-        v = " | V: " ++ testFlag' Overflow
-        n = "N: " ++ testFlag' Negative
-    in  concat $ reverse [c, z, i, d, b, x, v, n]
-    where testFlag' = show . fromEnum . testFlag flags
+extract :: Word8 -> Flags
+extract word = 
+    Flags {
+        negative = testBit word 7,
+        overflow = testBit word 6,
+        break = testBit word 4,
+        decimal = testBit word 3,
+        interrupt = testBit word 2,
+        zero = testBit word 1,
+        carry = testBit word 0
+    }

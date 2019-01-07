@@ -6,27 +6,24 @@ module Cpu where
     import Data.Word
     import Flags as F
 
-    data Cpu = Cpu { accumulator :: Word8 ,
-                     indexX :: Word8 ,
-                     indexY :: Word8 ,
+    data Cpu = Cpu { 
+                     registerA :: Word8 ,
+                     registerX :: Word8 ,
+                     registerY :: Word8 ,
                      programCounter :: Word16 ,
                      stackPointer :: Word8,
                      processorStatus :: Flags
-                     } deriving (Show)
-
+                   } deriving (Show)
 
     empty :: Cpu
-    empty = Cpu { accumulator = 0,
-                  indexX = 0,
-                  indexY = 0,
-                  programCounter = 0,
-                  stackPointer = 0,
+    empty = Cpu { 
+                  registerA = 0,
+                  registerX = 0,
+                  registerY = 0,
+                  programCounter = 0x34,
+                  stackPointer = 0xFD,
                   processorStatus = F.empty
                 }
-
-
-    showFlags :: Cpu -> String
-    showFlags Cpu {processorStatus} = F.printFlags processorStatus
 
     setFlags :: Cpu -> Flags -> Cpu
     setFlags cpu flags = cpu {processorStatus=flags}

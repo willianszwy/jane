@@ -39,6 +39,8 @@ executables:
     - bytestring
     - ncurses
     - mtl
+    - containers
+    - vector
 
 tests:
   jane-test:
