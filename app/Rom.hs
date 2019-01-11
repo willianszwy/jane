@@ -1,21 +1,21 @@
 module Rom where
 
-import qualified Data.ByteString               as B
+import qualified Data.ByteString as B
 import           Data.Binary.Strict.BitGet     as BG
 import           Data.Int
 import           Data.Binary.Strict.Get        as G
 import           Data.Word
+import           Data.Bits((.|.),shift)
 
 data INes = INes {
     header :: B.ByteString ,
     prg_rom :: Word8,
     chr_rom :: Word8,
-    mapper_lower :: Word8,
+    mapper  :: Word8,
     four_screen :: Bool,
     trainer :: Bool,
     battery_ram :: Bool,
     mirroring :: Bool,
-    mapper_upper :: Word8,
     is_nes_2 :: Word8,
     playchoice :: Bool ,
     vs_unisystem :: Bool
@@ -45,12 +45,11 @@ parserINesHeader = do
                 INes header
                      prg_rom
                      chr_rom
-                     mapper_lower
+                     (mapper_lower .|. ( shift mapper_upper 4))
                      four_screen
                      trainer
                      battery_ram
-                     mirroring
-                     mapper_upper
+                     mirroring                     
                      is_nes_2
                      playchoice
                     <$> BG.getBit

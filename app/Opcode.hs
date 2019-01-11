@@ -7,16 +7,17 @@ module Opcode where
 
     data AddressMode = 
                           None
-                        | Imm Data
-                        | Zpg Address
-                        | ZpX Address
+                        | Imm Word8
+                        | Zpg Word8
+                        | ZpX Word8
+                        | ZpY Word8
                         | Abs Address
                         | AbX Address
                         | AbY Address
-                        | InX Address
-                        | InY Address
+                        | Ind Address
+                        | InX Word8
+                        | InY Word8
                         deriving (Eq, Show)
-
 
                         
     data Opcode =  
