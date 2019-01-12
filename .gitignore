@@ -1,0 +1,8 @@
+.stack-work/
+jane.cabal
+*~
+
+*.nes
+out/
+.DS_Store
+.vscode/

@@ -2,14 +2,18 @@
 module Parse where
 
     import Data.Word (Word8,Word16)
-    import Data.Bits ((.|.),shift)
+    import Data.Bits ((.|.),(.&.),shift,shiftR)
     import Opcode as Op
     import VRam as VR
+    import Cpu
 
     data Chunk = Empty | Chunk { code :: Word8, lower :: Word8, upper :: Word8 } deriving (Eq,Show)
 
     getWord16 :: Word8 -> Word8 -> Word16 
     getWord16 upper lower = ( shift (fromIntegral upper) 8) .|. (fromIntegral lower)
+
+    getWord8 :: Word16 -> (Word8, Word8)
+    getWord8 x = ( fromIntegral (x .&. 0xFF), fromIntegral $ (x .&. 0xFF00) `shiftR` 8 )
 
     getWord16FromChunk :: Chunk -> Word16
     getWord16FromChunk Empty = error "Chunk Empty"
@@ -19,9 +23,9 @@ module Parse where
     getChunk address vram = 
             let t = VR.slice address (checkRange address) vram in 
             case length t of 
-                3 -> Chunk { code = t !! 0, lower = t !! 1, upper = t !! 2 }
-                2 -> Chunk { code = t !! 0, lower = t !! 1, upper = 0 }
-                1 -> Chunk { code = t !! 0, lower = 0, upper = 0 }
+                3 -> Chunk { code = head t, lower = t !! 1, upper = t !! 2 }
+                2 -> Chunk { code = head t, lower = t !! 1, upper = 0 }
+                1 -> Chunk { code = head t, lower = 0, upper = 0 }
             where                 
                 checkRange 0xFFFF = 1
                 checkRange 0xFFFE = 2
@@ -37,7 +41,7 @@ module Parse where
             0x06 -> ASL (Zpg (lower chunk)) 
             0x08 -> PHP None
             0x09 -> ORA (Imm (lower chunk)) 
-            0x0A -> ASL None
+            0x0A -> ASL Acc
             0x0D -> ORA (Abs (getWord16FromChunk chunk)) 
             0x0E -> ASL (Abs (getWord16FromChunk chunk)) 
             0x10 -> BPL None
@@ -48,14 +52,14 @@ module Parse where
             0x19 -> ORA (AbY (getWord16FromChunk chunk)) 
             0x1D -> ORA (AbX (getWord16FromChunk chunk)) 
             0x1E -> ASL (AbX (getWord16FromChunk chunk)) 
-            0x20 -> JSR None
+            0x20 -> JSR (Abs (getWord16FromChunk chunk)) 
             0x21 -> AND (InX (lower chunk)) 
             0x24 -> BIT (Zpg (lower chunk)) 
             0x25 -> AND (Zpg (lower chunk)) 
             0x26 -> ROL (Zpg (lower chunk)) 
             0x28 -> PLP None
             0x29 -> AND (Imm (lower chunk)) 
-            0x2A -> ROL None
+            0x2A -> ROL Acc
             0x2C -> BIT (Abs (getWord16FromChunk chunk))  
             0x2D -> AND (Abs (getWord16FromChunk chunk)) 
             0x2E -> ROL (Abs (getWord16FromChunk chunk)) 
@@ -73,7 +77,7 @@ module Parse where
             0x46 -> LSR (Zpg (lower chunk)) 
             0x48 -> PHA None
             0x49 -> EOR (Imm (lower chunk)) 
-            0x4A -> LSR None
+            0x4A -> LSR Acc
             0x4C -> JMP (Abs (getWord16FromChunk chunk)) 
             0x4D -> EOR (Abs (getWord16FromChunk chunk)) 
             0x4E -> LSR (Abs (getWord16FromChunk chunk)) 
@@ -91,7 +95,7 @@ module Parse where
             0x66 -> ROR (Zpg (lower chunk)) 
             0x68 -> PLA None
             0x69 -> ADC (Imm (lower chunk)) 
-            0x6A -> ROR None
+            0x6A -> ROR Acc
             0x6C -> JMP (Ind (getWord16FromChunk chunk)) 
             0x6D -> ADC (Abs (getWord16FromChunk chunk)) 
             0x6E -> ROR (Abs (getWord16FromChunk chunk)) 
@@ -181,3 +185,27 @@ module Parse where
             0xF9 -> SBC (AbY (getWord16FromChunk chunk)) 
             0xFD -> SBC (AbX (getWord16FromChunk chunk)) 
             0xFE -> INC (AbX (getWord16FromChunk chunk))  
+
+    readAddressMode :: AddressMode -> (Cpu,VRam) -> Maybe Word8
+    readAddressMode a (cpu,vram) = 
+            case a of
+                None  -> Nothing
+                Acc   -> Just (registerA cpu)
+                Imm x -> Just x
+                Zpg x -> Just (readRam $ fromIntegral x)
+                ZpX x -> Just (readRam $ wraps x (registerX cpu))
+                ZpY x -> Just (readRam $ wraps x (registerY cpu))
+                Abs x -> Just (readRam x)
+                AbX x -> Just (readRam $ x + fromIntegral (registerX cpu))
+                AbY x -> Just (readRam $ x + fromIntegral (registerY cpu))
+                InX x -> let a = readAddress $ wraps x (registerX cpu) in Just (readRam a)                          
+                InY x -> let a = readAddress $ fromIntegral x in Just (readRam $ a + (fromIntegral (registerY cpu) :: Word16) )
+                _ -> error "Error Address Mode unknown"
+            where 
+                readRam :: Word16 -> Word8
+                readRam = VR.read vram
+                    
+                wraps :: Word8 -> Word8 -> Word16
+                wraps x y = fromIntegral (x + y) :: Word16
+
+                readAddress x = getWord16 (readRam $ x + 1) (readRam x)

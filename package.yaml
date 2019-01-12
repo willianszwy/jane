@@ -1,26 +1,25 @@
 name:                jane
 version:             0.1.0.0
-github:              "githubuser/jane"
-license:             BSD3
-author:              "Author name here"
-maintainer:          "example@example.com"
-copyright:           "2018 Author name here"
+github:              "willianszwy/jane"
+license:             MIT
+author:              "Willians Amaral de Oliveira"
+maintainer:          "willianszwy@gmail.com"
+copyright:           "2018 Willians Oliveira"
 
 extra-source-files:
 - README.md
 - ChangeLog.md
 
-# Metadata used when publishing your package
-# synopsis:            Short description of your package
-# category:            Web
-
-# To avoid duplicated efforts in documentation and dealing with the
-# complications of embedding Haddock markup inside cabal files, it is
-# common to point users to the README.md file.
-description:         Please see the README on GitHub at <https://github.com/githubuser/jane#readme>
+description:         Please see the README on GitHub at <https://github.com/willianszwy/jane#readme>
 
 dependencies:
 - base >= 4.7 && < 5
+- binary-strict
+- bytestring
+- ncurses
+- mtl
+- containers
+- vector
 
 library:
   source-dirs: src
@@ -35,12 +34,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - jane
-    - binary-strict
-    - bytestring
-    - ncurses
-    - mtl
-    - containers
-    - vector
+    
 
 tests:
   jane-test:
@@ -52,3 +46,5 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - jane
+    - hspec
+    - QuickCheck

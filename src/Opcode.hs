@@ -1,24 +1,40 @@
 module Opcode where
 
     import Data.Word (Word8,Word16)
-
-    type Address = Word16
-    type Data = Word8
+    import Numeric(showHex)
+    import Data.Bits((.&.),xor)
+    import Flags
+    import Cpu
+    import VRam
 
     data AddressMode = 
                           None
+                        | Acc
                         | Imm Word8
                         | Zpg Word8
                         | ZpX Word8
                         | ZpY Word8
-                        | Abs Address
-                        | AbX Address
-                        | AbY Address
-                        | Ind Address
+                        | Abs Word16
+                        | AbX Word16
+                        | AbY Word16
+                        | Ind Word16
                         | InX Word8
                         | InY Word8
-                        deriving (Eq, Show)
-
+                        deriving (Eq)
+    
+    instance Show AddressMode where
+        show (None) = ""
+        show (Acc) = "A"
+        show (Imm x) = "#$" ++ showHex x ""
+        show (Zpg x) = "$" ++ showHex x ""
+        show (ZpX x) = "$" ++ showHex x ",X"
+        show (ZpY x) = "$" ++ showHex x ",Y"
+        show (Abs x) = "$" ++ showHex x ""
+        show (AbX x) = "$" ++ showHex x ",X"
+        show (AbY x) = "$" ++ showHex x ",Y"
+        show (Ind x) = "($" ++ showHex x ")"
+        show (InX x) = "($" ++ showHex x ",X)"
+        show (InY x) = "($" ++ showHex x "),Y"
                         
     data Opcode =  
                ADC  AddressMode
@@ -80,4 +96,31 @@ module Opcode where
              deriving (Eq,Show)
     
 
-   
+    
+
+    setNegative :: Word8 -> Bool
+    setNegative w = (w .&. 0x80) == 0x80
+
+    setZero :: Word8 -> Bool
+    setZero w = w == 0 
+    
+    setOverflow :: Word16 -> Word16 -> Word16 -> Bool
+    setOverflow a v s = ((a `xor` s) .&. (v `xor` s) .&. 0x80) == 0x80
+
+    setCarry :: Word16 -> Bool
+    setCarry w = (w .&. 0x100) == 0x100
+
+    adc :: Opcode -> (Cpu,VRam) -> Cpu
+    adc (ADC (Imm x)) (cpu,vram) = 
+        let 
+            flags = processorStatus cpu
+            c = fromIntegral (fromEnum $ carry flags ) :: Word16 
+            temp = (fromIntegral (registerA cpu) :: Word16) + (fromIntegral x :: Word16) + c       
+            newA = fromIntegral (temp .&. 0xFF) :: Word8
+            in
+            cpu { registerA = newA, processorStatus = flags {carry = setCarry temp,
+                            zero = setZero  newA,
+                            negative = setNegative newA,
+                            overflow = setOverflow (fromIntegral $ registerA cpu) (fromIntegral x) temp} } 
+
+
