@@ -16,7 +16,6 @@ dependencies:
 - base >= 4.7 && < 5
 - binary-strict
 - bytestring
-- ncurses
 - mtl
 - containers
 - vector
