@@ -2,10 +2,6 @@ module Opcode where
 
     import Data.Word (Word8,Word16)
     import Numeric(showHex)
-    import Data.Bits((.&.),xor)
-    import Flags
-    import Cpu
-    import VRam
 
     data AddressMode = 
                           None
@@ -95,32 +91,3 @@ module Opcode where
              | TYA  AddressMode
              deriving (Eq,Show)
     
-
-    
-
-    setNegative :: Word8 -> Bool
-    setNegative w = (w .&. 0x80) == 0x80
-
-    setZero :: Word8 -> Bool
-    setZero w = w == 0 
-    
-    setOverflow :: Word16 -> Word16 -> Word16 -> Bool
-    setOverflow a v s = ((a `xor` s) .&. (v `xor` s) .&. 0x80) == 0x80
-
-    setCarry :: Word16 -> Bool
-    setCarry w = (w .&. 0x100) == 0x100
-
-    adc :: Opcode -> (Cpu,VRam) -> Cpu
-    adc (ADC (Imm x)) (cpu,vram) = 
-        let 
-            flags = processorStatus cpu
-            c = fromIntegral (fromEnum $ carry flags ) :: Word16 
-            temp = (fromIntegral (registerA cpu) :: Word16) + (fromIntegral x :: Word16) + c       
-            newA = fromIntegral (temp .&. 0xFF) :: Word8
-            in
-            cpu { registerA = newA, processorStatus = flags {carry = setCarry temp,
-                            zero = setZero  newA,
-                            negative = setNegative newA,
-                            overflow = setOverflow (fromIntegral $ registerA cpu) (fromIntegral x) temp} } 
-
-

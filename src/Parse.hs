@@ -2,10 +2,12 @@
 module Parse where
 
     import Data.Word (Word8,Word16)
-    import Data.Bits ((.|.),(.&.),shift,shiftR)
+    import Data.Bits ((.|.),(.&.),shift,shiftR,xor)
+    import Data.Maybe(fromJust)
     import Opcode as Op
     import VRam as VR
     import Cpu
+    import Flags
 
     data Chunk = Empty | Chunk { code :: Word8, lower :: Word8, upper :: Word8 } deriving (Eq,Show)
 
@@ -209,3 +211,215 @@ module Parse where
                 wraps x y = fromIntegral (x + y) :: Word16
 
                 readAddress x = getWord16 (readRam $ x + 1) (readRam x)
+
+
+
+    translateAddressMode :: AddressMode -> (Cpu,VRam) -> Maybe Word16
+    translateAddressMode a (cpu,vram) = 
+            case a of
+                None  -> Nothing
+                Acc   -> Nothing
+                Imm x -> Nothing
+                Zpg x -> Just (fromIntegral x)
+                ZpX x -> Just (wraps x (registerX cpu))
+                ZpY x -> Just (wraps x (registerY cpu))
+                Abs x -> Just (x)
+                AbX x -> Just (x + fromIntegral (registerX cpu))
+                AbY x -> Just (x + fromIntegral (registerY cpu))
+                InX x -> let a = readAddress $ wraps x (registerX cpu) in Just (a)                          
+                InY x -> let a = readAddress $ fromIntegral x in Just (a + (fromIntegral (registerY cpu) :: Word16) )
+                _ -> error "Error Address Mode unknown"
+            where
+                readRam :: Word16 -> Word8
+                readRam = VR.read vram
+                    
+                wraps :: Word8 -> Word8 -> Word16
+                wraps x y = fromIntegral (x + y) :: Word16
+
+                readAddress x = getWord16 (readRam $ x + 1) (readRam x)
+
+    
+    setNegative :: Word8 -> Bool
+    setNegative w = (w .&. 0x80) == 0x80
+            
+    setZero :: Word8 -> Bool
+    setZero w = w == 0 
+                
+    setOverflow :: Word16 -> Word16 -> Word16 -> Bool
+    setOverflow a v s = ((a `xor` s) .&. (v `xor` s) .&. 0x80) == 0x80
+            
+    setCarry :: Word16 -> Bool
+    setCarry w = (w .&. 0x100) == 0x100
+            
+    adc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    adc (ADC (a)) (cpu,vram) = 
+            let 
+                x = fromJust $ readAddressMode a (cpu,vram)
+                flags = processorStatus cpu
+                c = fromIntegral (fromEnum $ carry flags ) :: Word16 
+                temp = (fromIntegral (registerA cpu) :: Word16) + (fromIntegral x :: Word16) + c       
+                newA = fromIntegral (temp .&. 0xFF) :: Word8
+            in
+            (cpu { registerA = newA, processorStatus = flags {carry = setCarry temp,
+                    zero = setZero  newA,
+                    negative = setNegative newA,
+                    overflow = setOverflow (fromIntegral $ registerA cpu) (fromIntegral x) temp} }, vram)
+    
+    -- FLAGS 
+    clc :: Cpu -> Cpu
+    clc cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {carry=False})
+
+    sec :: Cpu -> Cpu
+    sec cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {carry=True})
+
+    cli :: Cpu -> Cpu
+    cli cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {interrupt=False})
+
+    sei :: Cpu -> Cpu
+    sei cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {interrupt=True})
+
+    clv :: Cpu -> Cpu
+    clv cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {overflow=False})
+
+    cld :: Cpu -> Cpu
+    cld cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {decimal=False})
+
+    sed :: Cpu -> Cpu
+    sed cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {decimal=True})
+
+    -- Store Register
+    sta :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    sta (STA (a)) (cpu,vram) = 
+        let 
+            address = fromJust $ translateAddressMode a (cpu,vram) 
+            regA = registerA cpu
+        in
+            (cpu,VR.write vram address regA)
+
+    stx :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    stx (STX (a)) (cpu,vram) = 
+        let 
+            address = fromJust $ translateAddressMode a (cpu,vram) 
+            regX = registerX cpu
+        in
+            (cpu,VR.write vram address regX)
+
+
+    sty :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    sty (STY (a)) (cpu,vram) = 
+        let 
+            address = fromJust $ translateAddressMode a (cpu,vram) 
+            regY = registerY cpu
+        in
+            (cpu,VR.write vram address regY)
+
+    txs :: Cpu -> Cpu
+    txs cpu = cpu {stackPointer = registerX cpu}
+
+    tsx :: Cpu -> Cpu
+    tsx cpu = cpu {registerX = stackPointer cpu}
+
+    pha :: (Cpu,VRam) -> (Cpu,VRam)
+    pha (cpu,vram) = let sp = stackPointer cpu in 
+        (cpu{stackPointer=sp - 1}, VR.write vram (getWord16 0x01 sp) (registerA cpu))
+
+    pla :: (Cpu,VRam) -> (Cpu,VRam)
+    pla (cpu,vram) = 
+        let 
+            sp = (stackPointer cpu) + 1
+            newA = VR.read vram (getWord16 0x01 sp) 
+            flags = (processorStatus cpu){negative=setNegative newA,zero=setZero newA}
+
+        in
+            (cpu{registerA=newA,stackPointer=sp,processorStatus=flags},vram)
+
+    php :: (Cpu,VRam) -> (Cpu,VRam)
+    php (cpu,vram) = 
+        let 
+            sp = stackPointer cpu 
+            status = compact $ processorStatus cpu 
+        in
+            (cpu{stackPointer=sp - 1}, VR.write vram (getWord16 0x01 sp) (status))
+
+    
+    plp :: (Cpu,VRam) -> (Cpu,VRam)
+    plp (cpu,vram) =
+        let
+            sp = (stackPointer cpu) + 1
+            flags = extract $  VR.read vram (getWord16 0x01 sp) 
+        in
+            (cpu{processorStatus = flags, stackPointer=sp},vram)
+   
+    tax :: Cpu -> Cpu
+    tax cpu = 
+        let 
+            newX = registerA cpu
+            flags = (processorStatus cpu){negative=setNegative newX,zero=setZero newX}
+        in
+            cpu{registerX = newX, processorStatus = flags}
+
+    
+    txa :: Cpu -> Cpu
+    txa cpu = 
+        let 
+            newA = registerX cpu
+            flags = (processorStatus cpu){negative=setNegative newA,zero=setZero newA}
+        in
+            cpu{registerA = newA, processorStatus = flags}
+
+
+    dex :: Cpu -> Cpu
+    dex cpu = 
+        let
+            newX = (registerX cpu) - 1
+            flags = (processorStatus cpu){negative=setNegative newX,zero=setZero newX}
+        in
+            cpu{registerX=newX, processorStatus=flags}
+            
+            
+    inx :: Cpu -> Cpu
+    inx cpu = 
+        let
+            newX = (registerX cpu) + 1
+            flags = (processorStatus cpu){negative=setNegative newX,zero=setZero newX}
+        in
+            cpu{registerX=newX, processorStatus=flags}
+
+           
+--------------------------------------------------------------------------------
+
+
+    tay :: Cpu -> Cpu
+    tay cpu = 
+        let 
+            newY = registerA cpu
+            flags = (processorStatus cpu){negative=setNegative newY,zero=setZero newY}
+        in
+            cpu{registerY = newY, processorStatus = flags}
+
+    
+    tya :: Cpu -> Cpu
+    tya cpu = 
+        let 
+            newA = registerY cpu
+            flags = (processorStatus cpu){negative=setNegative newA,zero=setZero newA}
+        in
+            cpu{registerA = newA, processorStatus = flags}
+
+
+    dey :: Cpu -> Cpu
+    dey cpu = 
+        let
+            newY = (registerY cpu) - 1
+            flags = (processorStatus cpu){negative=setNegative newY,zero=setZero newY}
+        in
+            cpu{registerY=newY, processorStatus=flags}
+            
+            
+    iny :: Cpu -> Cpu
+    iny cpu = 
+        let
+            newY = (registerY cpu) + 1
+            flags = (processorStatus cpu){negative=setNegative newY,zero=setZero newY}
+        in
+            cpu{registerY=newY, processorStatus=flags}

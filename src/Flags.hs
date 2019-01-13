@@ -12,7 +12,8 @@ data Flags = Flags {
                      interrupt :: Bool,
                      zero :: Bool,
                      carry :: Bool
-                   } deriving (Show)
+                   } deriving (Eq,Show)
+
 
 empty :: Flags
 empty = Flags { 

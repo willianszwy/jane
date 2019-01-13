@@ -13,7 +13,9 @@ module Cpu where
                      programCounter :: Word16 ,
                      stackPointer :: Word8,
                      processorStatus :: Flags
-                   } deriving (Show)
+                   } deriving (Eq,Show)
+    
+
 
     empty :: Cpu
     empty = Cpu { 
