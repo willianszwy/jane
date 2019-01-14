@@ -5,7 +5,8 @@ module Opcode where
 
     data AddressMode = 
                           None
-                        | Acc
+                        | Acc 
+                        | Rel Word8
                         | Imm Word8
                         | Zpg Word8
                         | ZpX Word8
@@ -21,6 +22,7 @@ module Opcode where
     instance Show AddressMode where
         show (None) = ""
         show (Acc) = "A"
+        show (Rel x) = "*-" ++ showHex x ""
         show (Imm x) = "#$" ++ showHex x ""
         show (Zpg x) = "$" ++ showHex x ""
         show (ZpX x) = "$" ++ showHex x ",X"

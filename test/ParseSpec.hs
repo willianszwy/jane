@@ -460,3 +460,119 @@ module ParseSpec where
                 let vram = VRam.write getFakeVRam 0x0C 0xC2
                 let flags = (processorStatus getFakeCpu){overflow=True,negative=True,zero=False}
                 op_bit (BIT (Zpg 0x0C)) (getFakeCpu{registerA=0xA1},vram) `shouldBe` (getFakeCpu{registerA=0xA1,processorStatus=flags},vram)
+
+        describe "Parse.getSignedWord8" $ do
+            it "Calculate 2's compliments of a Word8" $ do
+                getSignedWord8 0xFF `shouldBe` 0x01
+                getSignedWord8 0x80 `shouldBe` 128
+
+
+        describe "Parse.offsetBranch" $ do
+            it "Returns de new Program Counter address giving a offset" $ do
+                offsetBranch 0x0004 0x02 `shouldBe` 0x0008
+
+        describe "Parse.op_bcc" $ do
+            it "Branch on carry clear | Carry = False " $ do
+                let pc = programCounter getFakeCpu
+                op_bcc (BCC (Rel 0x02)) getFakeCpu 
+                    `shouldBe` (getFakeCpu{programCounter = pc + 4})
+        
+        describe "Parse.op_bcc" $ do
+            it "Branch on carry clear | Carry = True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){carry=True}
+                op_bcc (BCC (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                        `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc})
+
+
+        describe "Parse.op_bcs" $ do
+            it "Branch on carry set | Carry = True " $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){carry=True}
+                op_bcs (BCS (Rel 0x02)) getFakeCpu{processorStatus=flags}
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4})
+                        
+        describe "Parse.op_bcs" $ do
+            it "Branch on carry set | Carry = False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){carry=False}
+                op_bcs (BCS (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc})
+
+        describe "Parse.op_beq" $ do
+            it "Branch on equal Zero True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){zero=True}
+                op_beq (BEQ (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4})
+
+        describe "Parse.op_beq" $ do
+            it "Branch on equal Zero False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){zero=False}
+                op_beq (BEQ (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc })
+
+        describe "Parse.op_bmi" $ do
+            it "Branch on Minus Negative True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){negative=True}
+                op_bmi (BMI (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
+
+        describe "Parse.op_bmi" $ do
+            it "Branch on Minus Negative False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){negative=False}
+                op_bmi (BMI (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+
+
+        describe "Parse.op_bne" $ do
+            it "Branch on not Equal Zero False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){zero=False}
+                op_bne (BNE (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
+            
+        describe "Parse.op_bne" $ do
+            it "Branch on not Equal Zero True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){zero=True}
+                op_bne (BNE (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+
+        describe "Parse.op_bpl" $ do
+            it "Branch on Plus negative False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){negative=False}
+                op_bpl (BPL (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
+                        
+        describe "Parse.op_bpl" $ do
+            it "Branch on not Plus negative True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){negative=True}
+                op_bpl (BPL (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+
+
+        describe "Parse.op_bvc" $ do
+            it "Branch on Overflow False" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){overflow=False}
+                op_bvc (BVC (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
+                                    
+        describe "Parse.op_bvc" $ do
+            it "Branch on Overflow True" $ do
+                let pc = programCounter getFakeCpu
+                let flags = (processorStatus getFakeCpu){overflow=True}
+                op_bvc (BVC (Rel 0x02)) getFakeCpu{processorStatus=flags} 
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+            
+
+        
+
+
+        

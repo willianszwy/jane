@@ -2,7 +2,7 @@
 module Parse where
 
     import Data.Word (Word8,Word16)
-    import Data.Bits ((.|.),(.&.),shift,shiftR,xor)
+    import Data.Bits ((.|.),(.&.),shift,shiftR,xor,complement)
     import Data.Maybe(fromJust)
     import Opcode as Op
     import VRam as VR
@@ -46,7 +46,7 @@ module Parse where
             0x0A -> ASL Acc
             0x0D -> ORA (Abs (getWord16FromChunk chunk)) 
             0x0E -> ASL (Abs (getWord16FromChunk chunk)) 
-            0x10 -> BPL None
+            0x10 -> BPL (Rel (lower chunk))
             0x11 -> ORA (InY (lower chunk)) 
             0x15 -> ORA (ZpX (lower chunk)) 
             0x16 -> ASL (ZpX (lower chunk)) 
@@ -65,7 +65,7 @@ module Parse where
             0x2C -> BIT (Abs (getWord16FromChunk chunk))  
             0x2D -> AND (Abs (getWord16FromChunk chunk)) 
             0x2E -> ROL (Abs (getWord16FromChunk chunk)) 
-            0x30 -> BMI None
+            0x30 -> BMI (Rel (lower chunk))
             0x31 -> AND (InY (lower chunk)) 
             0x35 -> AND (ZpX (lower chunk)) 
             0x36 -> ROL (ZpX (lower chunk)) 
@@ -83,7 +83,7 @@ module Parse where
             0x4C -> JMP (Abs (getWord16FromChunk chunk)) 
             0x4D -> EOR (Abs (getWord16FromChunk chunk)) 
             0x4E -> LSR (Abs (getWord16FromChunk chunk)) 
-            0x50 -> BVC None
+            0x50 -> BVC (Rel (lower chunk))
             0x51 -> EOR (InY (lower chunk)) 
             0x55 -> EOR (ZpX (lower chunk)) 
             0x56 -> LSR (ZpX (lower chunk)) 
@@ -101,7 +101,7 @@ module Parse where
             0x6C -> JMP (Ind (getWord16FromChunk chunk)) 
             0x6D -> ADC (Abs (getWord16FromChunk chunk)) 
             0x6E -> ROR (Abs (getWord16FromChunk chunk)) 
-            0x70 -> BVS None
+            0x70 -> BVS (Rel (lower chunk))
             0x71 -> ADC (InY (lower chunk)) 
             0x75 -> ADC (ZpX (lower chunk)) 
             0x76 -> ROR (ZpX (lower chunk)) 
@@ -118,7 +118,7 @@ module Parse where
             0x8C -> STY (Abs (getWord16FromChunk chunk)) 
             0x8D -> STA (Abs (getWord16FromChunk chunk)) 
             0x8E -> STX (Abs (getWord16FromChunk chunk)) 
-            0x90 -> BCC None
+            0x90 -> BCC (Rel (lower chunk))
             0x91 -> STA (InY (lower chunk)) 
             0x94 -> STY (ZpX (lower chunk)) 
             0x95 -> STA (ZpX (lower chunk)) 
@@ -138,7 +138,7 @@ module Parse where
             0xAC -> LDY (Abs (getWord16FromChunk chunk)) 
             0xAD -> LDA (Abs (getWord16FromChunk chunk)) 
             0xAE -> LDX (Abs (getWord16FromChunk chunk)) 
-            0xB0 -> BCS (Abs (getWord16FromChunk chunk)) 
+            0xB0 -> BCS (Rel (lower chunk)) 
             0xB1 -> LDA (InY (lower chunk)) 
             0xB4 -> LDY (ZpX (lower chunk)) 
             0xB5 -> LDA (ZpX (lower chunk)) 
@@ -160,7 +160,7 @@ module Parse where
             0xCC -> CPY (Abs (getWord16FromChunk chunk)) 
             0xCD -> CMP (Abs (getWord16FromChunk chunk)) 
             0xCE -> DEC (Abs (getWord16FromChunk chunk)) 
-            0xD0 -> BNE None
+            0xD0 -> BNE (Rel (lower chunk))
             0xD1 -> CMP (InY (lower chunk)) 
             0xD5 -> CMP (ZpX (lower chunk)) 
             0xD6 -> DEC (ZpX (lower chunk)) 
@@ -179,7 +179,7 @@ module Parse where
             0xEC -> CPX (Abs (getWord16FromChunk chunk)) 
             0xED -> SBC (Abs (getWord16FromChunk chunk)) 
             0xEE -> INC (Abs (getWord16FromChunk chunk)) 
-            0xF0 -> BEQ None
+            0xF0 -> BEQ (Rel (lower chunk))
             0xF1 -> SBC (InY (lower chunk)) 
             0xF5 -> SBC (ZpX (lower chunk)) 
             0xF6 -> INC (ZpX (lower chunk)) 
@@ -193,6 +193,7 @@ module Parse where
             case a of
                 None  -> Nothing
                 Acc   -> Just (registerA cpu)
+                Rel x -> Just x
                 Imm x -> Just x
                 Zpg x -> Just (readRam $ fromIntegral x)
                 ZpX x -> Just (readRam $ wraps x (registerX cpu))
@@ -603,3 +604,47 @@ module Parse where
             flags = (processorStatus cpu){negative=n,zero=z,overflow=v}
         in
             (cpu{processorStatus=flags},vram)
+    
+    -- Branch's
+    getSignedWord8 :: Word8 -> Word8
+    getSignedWord8 src  = if setNegative src then ((complement src) + 0x1 :: Word8) else src
+
+    offsetBranch :: Word16 -> Word8 -> Word16
+    offsetBranch pos offset = 
+        let off = fromIntegral (getSignedWord8 offset) :: Word16 in
+        if setNegative offset then pos - (off - 2) else pos + (off + 2)
+
+    branch :: AddressMode -> (Flags -> Bool) -> Bool -> Cpu -> Cpu
+    branch (Rel address) f b cpu = 
+        let
+            flags = processorStatus cpu
+            pc = programCounter cpu
+            newPC = if (f flags) == b then offsetBranch pc address 
+                 else pc
+        in
+            (cpu{programCounter=newPC})
+
+
+    op_bpl :: Opcode -> Cpu -> Cpu
+    op_bpl (BPL x) cpu = branch x negative False cpu
+
+    op_bmi :: Opcode -> Cpu -> Cpu
+    op_bmi (BMI x) cpu = branch x negative True cpu
+
+    op_bvc :: Opcode -> Cpu -> Cpu
+    op_bvc (BVC x) cpu = branch x overflow False cpu
+
+    op_bvs :: Opcode -> Cpu -> Cpu
+    op_bvs (BVS x) cpu = branch x overflow True cpu
+
+    op_bcc :: Opcode -> Cpu -> Cpu
+    op_bcc (BCC x) cpu = branch x carry False cpu
+
+    op_bcs :: Opcode -> Cpu -> Cpu
+    op_bcs (BCS x) cpu = branch x carry True cpu
+
+    op_bne :: Opcode -> Cpu -> Cpu
+    op_bne (BNE x) cpu = branch x zero False cpu
+
+    op_beq :: Opcode -> Cpu -> Cpu
+    op_beq (BEQ x) cpu = branch x zero True cpu
