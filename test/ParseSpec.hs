@@ -5,6 +5,7 @@ module ParseSpec where
     
     import Data.Word(Word8,Word16)
     import qualified Data.Vector.Unboxed as V
+    import Data.Bits as B
     import Parse
     import VRam
     import Opcode
@@ -135,186 +136,327 @@ module ParseSpec where
             it "throws an error if Address Mode is invalid " $ do
                 evaluate ( readAddressMode (Ind 0x0001) (getFakeCpu,getFakeVRam) ) `shouldThrow` anyErrorCall
 
-        describe "Parse.adc" $ do
+        describe "Parse.op_adc" $ do
             it "Add Memory to Accumulator with Carry" $ do
                 let op = ADC (Imm 0xFF)
                 let flags = processorStatus getFakeCpu
-                adc op (getFakeCpu { registerA = 0xFF},getFakeVRam) `shouldBe` 
+                op_adc op (getFakeCpu { registerA = 0xFF},getFakeVRam) `shouldBe` 
                  (getFakeCpu{ registerA = 0xFE,processorStatus= flags {carry=True,negative=True}},getFakeVRam)
 
-        describe "Parse.clc" $ do
+        describe "Parse.op_clc" $ do
             it "cleans the carry flag" $ do
                 let flags = processorStatus getFakeCpu
-                clc getFakeCpu {processorStatus = flags { carry=False}}
+                op_clc getFakeCpu {processorStatus = flags { carry=False}}
                   `shouldBe` getFakeCpu {processorStatus = flags { carry=False}}
 
-        describe "Parse.sec" $ do
+        describe "Parse.op_sec" $ do
             it "set the carry flag" $ do
                 let flags = processorStatus getFakeCpu
-                sec getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { carry=True}}
+                op_sec getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { carry=True}}
 
-        describe "Parse.cli" $ do
+        describe "Parse.op_cli" $ do
             it "cleans the interrupt flag" $ do
                 let flags = processorStatus getFakeCpu
-                cli getFakeCpu {processorStatus = flags { interrupt=False}}
+                op_cli getFakeCpu {processorStatus = flags { interrupt=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { interrupt=False}}
         
-        describe "Parse.sei" $ do
+        describe "Parse.op_sei" $ do
             it "set the interrupt flag" $ do
                 let flags = processorStatus getFakeCpu
-                sei getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { interrupt=True}}
+                op_sei getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { interrupt=True}}
 
-        describe "Parse.clv" $ do
+        describe "Parse.op_clv" $ do
             it "cleans the overflow flag" $ do
                 let flags = processorStatus getFakeCpu
-                clv getFakeCpu {processorStatus = flags { overflow=False}}
+                op_clv getFakeCpu {processorStatus = flags { overflow=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { overflow=False}}
 
-        describe "Parse.cld" $ do
+        describe "Parse.op_cld" $ do
             it "cleans the decimal flag" $ do
                 let flags = processorStatus getFakeCpu
-                cld getFakeCpu {processorStatus = flags { decimal=False}}
+                op_cld getFakeCpu {processorStatus = flags { decimal=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { decimal=False}}
                     
-        describe "Parse.sed" $ do
+        describe "Parse.op_sed" $ do
             it "set the decimal flag" $ do
                 let flags = processorStatus getFakeCpu
-                sed getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { decimal=True}}
+                op_sed getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { decimal=True}}
 
-        describe "Parse.sta" $ do
+        describe "Parse.op_sta" $ do
             it "Store Accumulator in Memory" $ do
                 let vram = VRam.write getFakeVRam 0xAA 0xA1
-                sta (STA (Zpg 0xAA)) (getFakeCpu {registerA = 0xA1},getFakeVRam) 
+                op_sta (STA (Zpg 0xAA)) (getFakeCpu {registerA = 0xA1},getFakeVRam) 
                     `shouldBe` (getFakeCpu {registerA = 0xA1},vram)
 
-        describe "Parse.stx" $ do
+        describe "Parse.op_stx" $ do
             it "Store Index X in Memory" $ do
                     let vram = VRam.write getFakeVRam 0xBB 0xA2
-                    stx (STX (Zpg 0xBB)) (getFakeCpu {registerX = 0xA2},getFakeVRam) 
+                    op_stx (STX (Zpg 0xBB)) (getFakeCpu {registerX = 0xA2},getFakeVRam) 
                         `shouldBe` (getFakeCpu {registerX = 0xA2},vram)
 
-        describe "Parse.sty" $ do
+        describe "Parse.op_sty" $ do
             it "Store Index Y in Memory" $ do
                     let vram = VRam.write getFakeVRam 0xCC 0xA3
-                    sty (STY (Zpg 0xCC)) (getFakeCpu {registerY = 0xA3},getFakeVRam) 
+                    op_sty (STY (Zpg 0xCC)) (getFakeCpu {registerY = 0xA3},getFakeVRam) 
                         `shouldBe` (getFakeCpu {registerY = 0xA3},vram)
 
         -- Stack
 
-        describe "Parse.txs" $ do
+        describe "Parse.op_txs" $ do
             it "Transfer X to Stack Pointer" $ do
-                txs (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
+                op_txs (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
                     `shouldBe` getFakeCpu {registerX = 0xBB, stackPointer = 0xBB}
         
-        describe "Parse.tsx" $ do
+        describe "Parse.op_tsx" $ do
             it "Transfer Stack Pointer to X" $ do
-                tsx (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
+                op_tsx (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
                     `shouldBe` getFakeCpu {registerX = 0xFF, stackPointer = 0xFF}
                         
-        describe "Parse.pha" $ do
+        describe "Parse.op_pha" $ do
             it "Push Accumulator to Stack" $ do
                 let vram = VRam.write getFakeVRam 0x1FF 0xCC
-                pha (getFakeCpu{registerA = 0xCC, stackPointer = 0xFF},getFakeVRam) 
+                op_pha (getFakeCpu{registerA = 0xCC, stackPointer = 0xFF},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA = 0xCC, stackPointer = 0xFE},vram)
 
             it "Push Accumulator to Stack should overflow" $ do
                 let vram = VRam.write getFakeVRam 0x100 0xDD
-                pha (getFakeCpu{registerA = 0xDD, stackPointer = 0x00},getFakeVRam) 
+                op_pha (getFakeCpu{registerA = 0xDD, stackPointer = 0x00},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA = 0xDD, stackPointer = 0xFF},vram)
 
-        describe "Parse.pla" $ do
+        describe "Parse.op_pla" $ do
             it "Pull Stack to Acummulator" $ do
                 let vram = VRam.write getFakeVRam 0x1FE 0xA1
                 let flags = (processorStatus getFakeCpu){negative = setNegative 0xA1, zero = setZero 0xA1}
-                pla (getFakeCpu{registerA = 0x00, stackPointer = 0xFD},vram) 
+                op_pla (getFakeCpu{registerA = 0x00, stackPointer = 0xFD},vram) 
                     `shouldBe` (getFakeCpu{registerA = 0xA1, stackPointer = 0xFE,processorStatus=flags},vram)
 
             it "Push Accumulator to Stack should overflow" $ do
                 let vram = VRam.write getFakeVRam 0x100 0xD1
                 let flags = (processorStatus getFakeCpu){negative = setNegative 0xD1, zero= setZero 0xD1}
-                pla (getFakeCpu{registerA = 0x00, stackPointer = 0xFF},vram) 
+                op_pla (getFakeCpu{registerA = 0x00, stackPointer = 0xFF},vram) 
                     `shouldBe` (getFakeCpu{registerA = 0xD1, stackPointer = 0x00, processorStatus=flags},vram)
        
-        describe "Parse.php" $ do
+        describe "Parse.op_php" $ do
             it "Push Processor Status to Stack" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=True}
                 let status = compact flags
                 let vram = VRam.write getFakeVRam 0x1FD status
-                php (getFakeCpu{processorStatus=flags},getFakeVRam)
+                op_php (getFakeCpu{processorStatus=flags},getFakeVRam)
                     `shouldBe` (getFakeCpu{processorStatus=flags,stackPointer = 0xFC},vram)
                         
-        describe "Parse.plp" $ do 
+        describe "Parse.op_plp" $ do 
             it "Pull Stack to Processor Status" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,interrupt=True}
                 let status = compact flags 
                 let vram = VRam.write getFakeVRam 0x1FE status
-                plp (getFakeCpu{stackPointer=0xFD},vram) 
+                op_plp (getFakeCpu{stackPointer=0xFD},vram) 
                     `shouldBe` (getFakeCpu{stackPointer=0xFE,processorStatus=flags},vram)
         
 
-        describe "Parse.tax" $ do
+        describe "Parse.op_tax" $ do
             it "Transfer Accumulator to X" $ do
                 let flags = (processorStatus getFakeCpu)
-                tax getFakeCpu{registerA=0xBA,registerX=0xBC} 
+                op_tax getFakeCpu{registerA=0xBA,registerX=0xBC} 
                     `shouldBe` getFakeCpu{registerA=0xBA,registerX=0xBA,
                         processorStatus=flags{negative=setNegative 0xBA,zero=setZero 0xBA}}
 
         
-        describe "Parse.txa" $ do
+        describe "Parse.op_txa" $ do
             it "Transfer Index X to A" $ do
                 let flags = (processorStatus getFakeCpu)
-                txa getFakeCpu{registerA=0xC1,registerX=0xC5} 
+                op_txa getFakeCpu{registerA=0xC1,registerX=0xC5} 
                    `shouldBe` getFakeCpu{registerA=0xC5,registerX=0xC5,
                         processorStatus=flags{negative=setNegative 0xC5,zero=setZero 0xC5}}
 
-        describe "Parse.dex" $ do
+        describe "Parse.op_dex" $ do
             it "Decrement Index X" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newX = (registerX getFakeCpu) - 1 :: Word8
-                dex getFakeCpu{registerX=newX + 1} 
+                op_dex getFakeCpu{registerX=newX + 1} 
                   `shouldBe` getFakeCpu{registerX=newX,
                         processorStatus=flags{negative=setNegative newX,zero=setZero newX}}
     
-        describe "Parse.inx" $ do
+        describe "Parse.op_inx" $ do
             it "Increment Index X" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newX = (registerX getFakeCpu) + 1 :: Word8
-                inx getFakeCpu{registerX=newX - 1} 
+                op_inx getFakeCpu{registerX=newX - 1} 
                     `shouldBe` getFakeCpu{registerX=newX,
                             processorStatus=flags{negative=setNegative newX,zero=setZero newX}}
 
 
-        describe "Parse.tay" $ do
+        describe "Parse.op_tay" $ do
             it "Transfer Accumulator to Y" $ do
                 let flags = (processorStatus getFakeCpu)
-                tay getFakeCpu{registerA=0xBA,registerY=0xBC} 
+                op_tay getFakeCpu{registerA=0xBA,registerY=0xBC} 
                         `shouldBe` getFakeCpu{registerA=0xBA,registerY=0xBA,
                                 processorStatus=flags{negative=setNegative 0xBA,zero=setZero 0xBA}}
                     
                             
-        describe "Parse.tya" $ do
+        describe "Parse.op_tya" $ do
             it "Transfer Index Y to A" $ do
                 let flags = (processorStatus getFakeCpu)
-                tya getFakeCpu{registerA=0xC1,registerY=0xC5} 
+                op_tya getFakeCpu{registerA=0xC1,registerY=0xC5} 
                         `shouldBe` getFakeCpu{registerA=0xC5,registerY=0xC5,
                                 processorStatus=flags{negative=setNegative 0xC5,zero=setZero 0xC5}}
                     
-        describe "Parse.dey" $ do
+        describe "Parse.op_dey" $ do
             it "Decrement Index Y" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newY = (registerY getFakeCpu) - 1 :: Word8
-                dey getFakeCpu{registerY=newY + 1} 
+                op_dey getFakeCpu{registerY=newY + 1} 
                         `shouldBe` getFakeCpu{registerY=newY,
                                 processorStatus=flags{negative=setNegative newY,zero=setZero newY}}
                         
-        describe "Parse.iny" $ do
+        describe "Parse.op_iny" $ do
             it "Increment Index Y" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newY = (registerY getFakeCpu) + 1 :: Word8
-                iny getFakeCpu{registerY=newY - 1} 
+                op_iny getFakeCpu{registerY=newY - 1} 
                         `shouldBe` getFakeCpu{registerY=newY,
                                 processorStatus=flags{negative=setNegative newY,zero=setZero newY}}
 
+       
+        describe "Parse.op_dec" $ do
+            it "Decrement Memory by One" $ do
+                let value = (0x0A :: Word8)
+                let vram = VRam.write getFakeVRam 0xBC value
+                let vram' = VRam.write getFakeVRam 0xBC (value - 1)
+                let flags = (processorStatus getFakeCpu){negative=setNegative (value - 1),zero=setZero (value - 1)}
+                op_dec (DEC (Abs 0x00BC)) (getFakeCpu,vram) `shouldBe` (getFakeCpu,vram')
+
+
+        describe "Parse.op_inc" $ do
+            it "Increment Memory by One" $ do
+                let value = (0x0B :: Word8)
+                let vram = VRam.write getFakeVRam 0xBD value
+                let vram' = VRam.write getFakeVRam 0xBD (value + 1)
+                let flags = (processorStatus getFakeCpu){negative=setNegative (value + 1),zero=setZero (value + 1)}
+                op_inc (INC (Abs 0x00BD)) (getFakeCpu,vram) `shouldBe` (getFakeCpu,vram')
+
+        
+        describe "Parse.op_cmp" $ do
+            it "Compare Memory with Accumulator" $ do
+                let flags = (processorStatus getFakeCpu){negative=True}
+                op_cmp (CMP (Imm 0x80)) (getFakeCpu{registerA=0x7F},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerA=0x7F,processorStatus=flags},getFakeVRam)
+
+
+        describe "Parse.op_cpx" $ do
+            it "Compare Memory and Index X" $ do
+                let flags = (processorStatus getFakeCpu){negative=True}
+                op_cpx (CPX (Imm 0x80)) (getFakeCpu{registerX=0x7F},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerX=0x7F,processorStatus=flags},getFakeVRam)
 
                     
+        describe "Parse.op_cpy" $ do
+            it "Compare Memory and Index Y" $ do
+                let flags = (processorStatus getFakeCpu){negative=True}
+                op_cpy (CPY (Imm 0x80)) (getFakeCpu{registerY=0x7F},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerY=0x7F,processorStatus=flags},getFakeVRam)
+
+
+        describe "Parse.op_and" $ do
+            it "AND Memory with Accumulator" $ do
+                let res = (0x80 :: Word8) B..&. (0x05 :: Word8)
+                let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
+                op_and (AND (Imm 0x80)) (getFakeCpu{registerA=0x05},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerA=res,processorStatus=flags},getFakeVRam)
+
+
+        describe "Parse.op_ora" $ do
+            it "OR Memory with Accumulator" $ do
+                let res = (0x80 :: Word8) B..|. (0x05 :: Word8)
+                let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
+                op_ora (ORA (Imm 0x80)) (getFakeCpu{registerA=0x05},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerA=res,processorStatus=flags},getFakeVRam)
+
+
+        describe "Parse.op_eor" $ do
+            it "XOR Memory with Accumulator" $ do
+                let res = B.xor (0x80 :: Word8) (0x05 :: Word8)
+                let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
+                op_eor (EOR (Imm 0x80)) (getFakeCpu{registerA=0x05},getFakeVRam)
+                    `shouldBe` (getFakeCpu{registerA=res,processorStatus=flags},getFakeVRam)
+            
+       
+        describe "Parse.op_asl" $ do
+            it "Shift Left One Bit (Accumulator)" $ do
+                op_asl (ASL Acc) (getFakeCpu{registerA=0x1},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x2},getFakeVRam)
+
+            it "Shift Left One Bit (Memory)" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0x01
+                let vram'= VRam.write getFakeVRam 0xBD 0x02
+                op_asl (ASL (Zpg 0xBD)) (getFakeCpu,vram)
+                    `shouldBe` (getFakeCpu,vram')
+
+
+        describe "Parse.op_lsr" $ do
+            it "Shift Right One Bit (Accumulator)" $ do
+                op_lsr (LSR Acc) (getFakeCpu{registerA=0x2},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x1},getFakeVRam)
+            
+            it "Shift Right One Bit (Memory)" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0x02
+                let vram'= VRam.write getFakeVRam 0xBD 0x01
+                op_lsr (LSR (Zpg 0xBD)) (getFakeCpu,vram)
+                    `shouldBe` (getFakeCpu,vram')
+            
+
+        describe "Parse.op_rol" $ do
+            it "Rotate One Bit Left (Accumulator) with Carry True" $ do
+                let flags = (processorStatus getFakeCpu){carry=True,negative=True}
+                op_rol (ROL Acc) (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
+                    `shouldBe` (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam)
+
+            it "Rotate One Bit Left (Accumulator) with Carry False" $ do
+                let flags = (processorStatus getFakeCpu){carry=True,negative=True}
+                op_rol (ROL Acc) (getFakeCpu{registerA=0xFF},getFakeVRam) 
+                    `shouldBe` (getFakeCpu{registerA=0xFE,processorStatus=flags},getFakeVRam)
+
+            it "Rotate One Bit Left (Memory) with Carry True" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0xBD
+                let vram'= VRam.write getFakeVRam 0xBD 0x7B
+                let flags = (processorStatus getFakeCpu){carry=True,negative=False}
+                op_rol (ROL (Zpg 0xBD)) (getFakeCpu{processorStatus=flags},vram) 
+                    `shouldBe` (getFakeCpu{processorStatus=flags},vram')
+        
+            it "Rotate One Bit Left (Memory) with Carry False" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0xBD
+                let vram'= VRam.write getFakeVRam 0xBD 0x7A
+                let flags = (processorStatus getFakeCpu){carry=True,negative=False}
+                op_rol (ROL (Zpg 0xBD)) (getFakeCpu,vram) 
+                    `shouldBe` (getFakeCpu{processorStatus=flags},vram')
+
+
+
+        describe "Parse.op_ror" $ do
+            it "Rotate One Bit Right (Memory or Accumulator) with Carry True" $ do
+                let flags = (processorStatus getFakeCpu){carry=True,negative=True}
+                op_ror (ROR Acc) (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
+                    `shouldBe` (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam)
+            
+            it "Rotate One Bit Right (Memory or Accumulator) with Carry False" $ do
+                let flags = (processorStatus getFakeCpu){carry=True,negative=False}
+                op_ror (ROR Acc) (getFakeCpu{registerA=0xFF},getFakeVRam) 
+                    `shouldBe` (getFakeCpu{registerA=0x7F,processorStatus=flags},getFakeVRam)
+
+            it "Rotate One Bit Right (Memory or Accumulator) with Carry True" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0xCD
+                let vram'= VRam.write getFakeVRam 0xBD 0xE6
+                let flags = (processorStatus getFakeCpu){carry=True,negative=True}
+                op_ror (ROR (Zpg 0xBD)) (getFakeCpu{processorStatus=flags},vram) 
+                    `shouldBe` (getFakeCpu{processorStatus=flags},vram')
+                    
+            it "Rotate One Bit Right (Memory or Accumulator) with Carry False" $ do
+                let vram = VRam.write getFakeVRam 0xBD 0xCD
+                let vram'= VRam.write getFakeVRam 0xBD 0x66
+                let flags = (processorStatus getFakeCpu){carry=True,negative=False}
+                op_ror (ROR (Zpg 0xBD)) (getFakeCpu,vram) 
+                    `shouldBe` (getFakeCpu{processorStatus=flags},vram')
                          
+
+        describe "Parse.op_bit" $ do
+            it "Test Bits in Memory with Accumulator" $ do
+                let vram = VRam.write getFakeVRam 0x0C 0xC2
+                let flags = (processorStatus getFakeCpu){overflow=True,negative=True,zero=False}
+                op_bit (BIT (Zpg 0x0C)) (getFakeCpu{registerA=0xA1},vram) `shouldBe` (getFakeCpu{registerA=0xA1,processorStatus=flags},vram)
