@@ -143,6 +143,13 @@ module ParseSpec where
                 op_adc op (getFakeCpu { registerA = 0xFF},getFakeVRam) `shouldBe` 
                  (getFakeCpu{ registerA = 0xFE,processorStatus= flags {carry=True,negative=True}},getFakeVRam)
 
+        
+        describe "Parse.op_sbc" $ 
+            it "Subtract Memory from Accumulator with Borrow" $ do
+                let flags = (processorStatus getFakeCpu){zero=True,carry=False}
+                op_sbc (SBC (Imm 0x01)) (getFakeCpu{registerA=0x02},getFakeVRam) 
+                    `shouldBe` (getFakeCpu{registerA=0x00,processorStatus=flags},getFakeVRam)
+
         describe "Parse.op_clc" $ do
             it "cleans the carry flag" $ do
                 let flags = processorStatus getFakeCpu
@@ -570,9 +577,74 @@ module ParseSpec where
                 let flags = (processorStatus getFakeCpu){overflow=True}
                 op_bvc (BVC (Rel 0x02)) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+
+        describe "Parse.op_jmp" $ do
+            it "Jump to New Location Indirect" $ do
+                let vram  = VRam.write getFakeVRam 0x01FF 0x80
+                let vram' = VRam.write vram 0x0100 0x02
+                op_jmp (JMP (Ind 0x01FF)) (getFakeCpu,vram') 
+                    `shouldBe` (getFakeCpu{programCounter=0x0280},vram')
+
+            it "Jump to New Location Absolute" $ do
+                op_jmp (JMP (Abs 0x01FF)) (getFakeCpu,getFakeVRam) 
+                    `shouldBe` (getFakeCpu{programCounter=0x01FF},getFakeVRam)
+
+
+        describe "Parse.op_jsr" $ do
+            it "Jump to New Location Saving Return Address" $ do
+                let vram = VRam.write getFakeVRam 0x01FD 0x01
+                let vram' = VRam.write vram 0x01FC 0x02
+                op_jsr (JSR (Abs 0x0110)) (getFakeCpu{programCounter=0x0100},getFakeVRam) `shouldBe` 
+                        (getFakeCpu{programCounter=0x0110,stackPointer=0xFB},vram')
+
+
+        describe "Parse.op_rts" $ do
+            it "Return from Subroutine" $ do
+                let pc = programCounter getFakeCpu
+                let (cpu,vram) = op_jsr (JSR (Abs 0x0100)) (getFakeCpu,getFakeVRam)
+                op_rts (cpu,vram) `shouldBe` (getFakeCpu{programCounter=pc + 2},vram)
+            
             
 
-        
+        describe "Parse.push" $ do
+            it "Push data on stack" $ do
+                let sp = stackPointer getFakeCpu
+                let vram = VRam.write getFakeVRam (getWord16 0x01 sp) 0x10
+                push 0x10 (getFakeCpu, getFakeVRam) `shouldBe` (getFakeCpu{stackPointer=sp - 1},vram)
 
 
+        describe "Parse.pull" $ do
+            it "Pull data from stack" $ do
+                let (cpu,vram) =  push 0x10 (getFakeCpu, getFakeVRam)
+                let sp = stackPointer cpu
+                pull (cpu,vram) `shouldBe` (0x10,(cpu{stackPointer= sp + 1},vram))
+
+
+        describe "Parse.brk" $ do
+            it "Force Break" $ do
+                let vram = VRam.init {
+                    ram = RAM (V.replicate 0x800 0xFF),
+                    ppu = PPU (V.empty),
+                    apu = APU (V.empty),
+                    openBus = OPB (V.empty),
+                    sram = SRM (V.empty),
+                    programRom = PRG (V.replicate 0x8000 0)
+                }
+                let flags = processorStatus getFakeCpu
+                let sp = stackPointer getFakeCpu - 3
+                let vram1 = VRam.write vram 0x1FD  0
+                let vram2 = VRam.write vram1 0x1FC 54
+                let vram3 = VRam.write vram2 0x1FB 48
+                op_brk (getFakeCpu, vram) 
+                    `shouldBe` (getFakeCpu{processorStatus=flags{Flags.break=True,interrupt=True}
+                                ,stackPointer=sp,programCounter=0x0}, vram3)
         
+        describe "Parse.rti" $ do
+            it "Return from Interrupt" $ do
+                let flags = processorStatus getFakeCpu
+                let sp = stackPointer getFakeCpu - 3
+                let vram = VRam.write getFakeVRam 0x1FD  0
+                let vram1 = VRam.write vram 0x1FC 54
+                let vram2 = VRam.write vram1 0x1FB 48
+                op_rti (getFakeCpu{stackPointer=sp},vram2)
+                    `shouldBe` (getFakeCpu{processorStatus=flags{Flags.break=True},programCounter=54},vram2)

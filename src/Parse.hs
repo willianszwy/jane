@@ -253,18 +253,28 @@ module Parse where
     setCarry w = (w .&. 0x100) == 0x100
             
     op_adc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_adc (ADC a) (cpu,vram) = 
-            let 
-                x = fromJust $ readAddressMode a (cpu,vram)
-                flags = processorStatus cpu
-                c = fromIntegral (fromEnum $ carry flags ) :: Word16 
-                temp = (fromIntegral (registerA cpu) :: Word16) + (fromIntegral x :: Word16) + c       
-                newA = fromIntegral (temp .&. 0xFF) :: Word8
-            in
+    op_adc (ADC a) (cpu,vram) = mathOperation a ((+)) (carry) (cpu,vram)
+
+    op_sbc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_sbc (SBC a) (cpu,vram) = mathOperation a ((-)) (not . carry) (cpu,vram)
+
+
+    mathOperation :: AddressMode -> (Word16 -> Word16 -> Word16) -> (Flags -> Bool) -> (Cpu,VRam) -> (Cpu,VRam)
+    mathOperation a operator flag (cpu,vram) = 
+        let 
+            x = fromJust $ readAddressMode a (cpu,vram)
+            flags = processorStatus cpu
+            c = fromIntegral ( fromEnum $ flag flags) :: Word16
+            temp = (fromIntegral (registerA cpu) :: Word16) `operator` (fromIntegral x :: Word16) `operator` c
+            newA = fromIntegral (temp .&. 0xFF) :: Word8
+        in
             (cpu { registerA = newA, processorStatus = flags {carry = setCarry temp,
                     zero = setZero  newA,
                     negative = setNegative newA,
-                    overflow = setOverflow (fromIntegral $ registerA cpu) (fromIntegral x) temp} }, vram)
+                    overflow =  setOverflow (fromIntegral $ registerA cpu) (fromIntegral x) temp} }, vram)
+
+    
+
     
     -- FLAGS 
     op_clc :: Cpu -> Cpu
@@ -648,3 +658,75 @@ module Parse where
 
     op_beq :: Opcode -> Cpu -> Cpu
     op_beq (BEQ x) cpu = branch x zero True cpu
+
+    -- Jumps
+
+    op_jmp :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_jmp (JMP (Abs address)) (cpu,vram) = (cpu{programCounter=address},vram)
+    op_jmp (JMP (Ind address)) (cpu,vram) = 
+        let
+            (a_lower,a_upper) = getWord8 address
+            lower = VR.read vram address
+            upper = VR.read vram (getWord16 a_upper (a_lower + 1))
+        in
+            (cpu{programCounter=getWord16 upper lower},vram)
+
+    
+    op_jsr :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_jsr (JSR (Abs a)) (cpu,vram) = 
+        let 
+            (lower,upper) = getWord8 $ (programCounter cpu) + 2
+            (cpu',vram')= push upper (cpu,vram)
+            (cpu1,vram1)= push lower (cpu',vram')
+        in
+            (cpu1{programCounter=a},vram1)
+
+
+    op_rts :: (Cpu,VRam) -> (Cpu,VRam)
+    op_rts (cpu,vram) = 
+        let
+            (lower,(cpu',vram'))   = pull  (cpu,vram)
+            (upper,(cpu1,vram1))   = pull  (cpu',vram')
+            address = (getWord16 upper lower)
+        in 
+            (cpu1{programCounter=address},vram1)
+
+    op_brk :: (Cpu,VRam) -> (Cpu,VRam)
+    op_brk (cpu,vram) = 
+        let
+            (lower,upper) = getWord8 $ (programCounter cpu) + 2
+            (cpu',vram')= push upper (cpu,vram)
+            (cpu1,vram1)= push lower (cpu',vram')
+            flags = processorStatus cpu1
+            (cpu2,vram2) = op_php (cpu1{processorStatus=flags{Flags.break=True}},vram1)
+        in
+            op_jmp (JMP (Ind 0xFFFE)) (cpu2{processorStatus=flags{interrupt=True,Flags.break=True}},vram2)
+
+    op_rti :: (Cpu,VRam) -> (Cpu,VRam)
+    op_rti (cpu,vram) = 
+        let
+            (cpu1,vram1) = op_plp(cpu,vram)
+            (lower,(cpu2,vram2))   = pull  (cpu1,vram1)
+            (upper,(cpu3,vram3))   = pull  (cpu2,vram2)
+            address = (getWord16 upper lower)
+        in 
+            (cpu3{programCounter=address},vram3)
+
+
+    push :: Word8 -> (Cpu,VRam) -> (Cpu,VRam)
+    push v (cpu,vram) = 
+        let
+            sp = stackPointer cpu
+            vram' = VR.write vram (getWord16 0x01 sp) v
+        in
+            (cpu{stackPointer=sp - 1},vram')
+
+
+    pull :: (Cpu,VRam) -> (Word8,(Cpu,VRam))
+    pull (cpu,vram) = 
+        let
+            sp = (stackPointer cpu) + 1
+            value = VR.read vram (getWord16 0x01 sp)
+        in
+            (value,(cpu{stackPointer=sp},vram))
+            
