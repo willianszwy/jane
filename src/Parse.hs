@@ -186,7 +186,8 @@ module Parse where
             0xF8 -> SED None
             0xF9 -> SBC (AbY (getWord16FromChunk chunk)) 
             0xFD -> SBC (AbX (getWord16FromChunk chunk)) 
-            0xFE -> INC (AbX (getWord16FromChunk chunk))  
+            0xFE -> INC (AbX (getWord16FromChunk chunk))
+            x ->  error $ "codigo nao cadastrado: " ++ show x
 
     readAddressMode :: AddressMode -> (Cpu,VRam) -> Maybe Word8
     readAddressMode a (cpu,vram) = 
@@ -218,9 +219,9 @@ module Parse where
     translateAddressMode :: AddressMode -> (Cpu,VRam) -> Maybe Word16
     translateAddressMode a (cpu,vram) = 
             case a of
-                None  -> Nothing
-                Acc   -> Nothing
-                Imm x -> Nothing
+                -- None  -> Nothing
+                -- Acc   -> Nothing
+                Imm x -> Just (fromIntegral x :: Word16)
                 Zpg x -> Just (fromIntegral x)
                 ZpX x -> Just (wraps x (registerX cpu))
                 ZpY x -> Just (wraps x (registerY cpu))
@@ -229,7 +230,7 @@ module Parse where
                 AbY x -> Just (x + fromIntegral (registerY cpu))
                 InX x -> let a = readAddress $ wraps x (registerX cpu) in Just (a)                          
                 InY x -> let a = readAddress $ fromIntegral x in Just (a + (fromIntegral (registerY cpu) :: Word16) )
-                _ -> error "Error Address Mode unknown"
+                x -> error $ "Error Address Mode unknown: " ++ show cpu
             where
                 readRam :: Word16 -> Word8
                 readRam = VR.read vram
@@ -238,6 +239,76 @@ module Parse where
                 wraps x y = fromIntegral (x + y) :: Word16
 
                 readAddress x = getWord16 (readRam $ x + 1) (readRam x)
+
+    updateProgramCounter :: Word16 -> Cpu -> Cpu
+    updateProgramCounter inc cpu = let pc = programCounter cpu in cpu{programCounter = pc + inc }
+
+    nextOpcode :: AddressMode -> Cpu -> Cpu
+    nextOpcode None    cpu  = updateProgramCounter 1 cpu 
+    nextOpcode Acc     cpu  = updateProgramCounter 1 cpu 
+    nextOpcode (Abs _) cpu  = updateProgramCounter 3 cpu 
+    nextOpcode (AbX _) cpu  = updateProgramCounter 3 cpu 
+    nextOpcode (AbY _) cpu  = updateProgramCounter 3 cpu  
+    nextOpcode (Ind _) cpu  = updateProgramCounter 3 cpu 
+    nextOpcode _       cpu  = updateProgramCounter 2 cpu 
+
+    execOpcode :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
+    execOpcode (ADC addmod) (cpu,vram) = let (cpu', vram') = op_asl   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' )
+    execOpcode (AND addmod) (cpu,vram) = let (cpu', vram') = op_asl   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' )
+    execOpcode (ASL addmod) (cpu,vram) = let (cpu', vram') = op_asl   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' )
+    execOpcode (BCC addmod) (cpu,vram) = (op_bcc   addmod  cpu,vram)
+    execOpcode (BCS addmod) (cpu,vram) = (op_bcs   addmod  cpu,vram) 
+    execOpcode (BEQ addmod) (cpu,vram) = (op_beq   addmod  cpu,vram) 
+    execOpcode (BIT addmod) (cpu,vram) = let (cpu', vram') = op_bit   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (BMI addmod) (cpu,vram) = (op_bmi   addmod  cpu,vram) 
+    execOpcode (BNE addmod) (cpu,vram) = (op_bne   addmod  cpu,vram) 
+    execOpcode (BPL addmod) (cpu,vram) = (op_bpl   addmod  cpu,vram)
+    execOpcode (BRK addmod) (cpu,vram) = op_brk           (cpu,vram)
+    execOpcode (BVC addmod) (cpu,vram) = (op_bvc   addmod  cpu,vram)
+    execOpcode (BVS addmod) (cpu,vram) = (op_bvs   addmod  cpu,vram)
+    execOpcode (CLC addmod) (cpu,vram) = let (cpu', vram') = (op_clc           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CLD addmod) (cpu,vram) = let (cpu', vram') = (op_cld           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CLI addmod) (cpu,vram) = let (cpu', vram') = (op_cli           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CLV addmod) (cpu,vram) = let (cpu', vram') = (op_clv           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CMP addmod) (cpu,vram) = let (cpu', vram') = op_cmp   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CPX addmod) (cpu,vram) = let (cpu', vram') = op_cpx   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (CPY addmod) (cpu,vram) = let (cpu', vram') = op_cpy   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (DEC addmod) (cpu,vram) = let (cpu', vram') = op_dec   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (DEX addmod) (cpu,vram) = let (cpu', vram') = (op_dex           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (DEY addmod) (cpu,vram) = let (cpu', vram') = (op_dey           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (EOR addmod) (cpu,vram) = let (cpu', vram') = op_eor   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (INC addmod) (cpu,vram) = let (cpu', vram') = op_inc   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (INX addmod) (cpu,vram) = let (cpu', vram') = (op_inx           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (INY addmod) (cpu,vram) = let (cpu', vram') = (op_iny           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (JMP addmod) (cpu,vram) = op_jmp   addmod  (cpu,vram)  
+    execOpcode (JSR addmod) (cpu,vram) = op_jsr   addmod  (cpu,vram)
+    execOpcode (LDA addmod) (cpu,vram) = let (cpu', vram') = op_lda   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (LDX addmod) (cpu,vram) = let (cpu', vram') = op_ldx   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (LDY addmod) (cpu,vram) = let (cpu', vram') = op_ldy   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (LSR addmod) (cpu,vram) = let (cpu', vram') = op_lsr   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (NOP addmod) (cpu,vram) = (cpu, vram)
+    execOpcode (ORA addmod) (cpu,vram) = let (cpu', vram') = op_ora   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (PHA addmod) (cpu,vram) = let (cpu', vram') = op_pha           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (PHP addmod) (cpu,vram) = let (cpu', vram') = op_php           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (PLA addmod) (cpu,vram) = let (cpu', vram') = op_pla           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (PLP addmod) (cpu,vram) = let (cpu', vram') = op_plp           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (ROL addmod) (cpu,vram) = let (cpu', vram') = op_rol   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (ROR addmod) (cpu,vram) = let (cpu', vram') = op_ror   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (RTI addmod) (cpu,vram) = op_rti           (cpu,vram) 
+    execOpcode (RTS addmod) (cpu,vram) = op_rts           (cpu,vram) 
+    execOpcode (SBC addmod) (cpu,vram) = let (cpu', vram') = op_sbc   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (SEC addmod) (cpu,vram) = let (cpu', vram') = (op_sec           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (SED addmod) (cpu,vram) = let (cpu', vram') = (op_sed           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (SEI addmod) (cpu,vram) = let (cpu', vram') = (op_sei           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (STA addmod) (cpu,vram) = let (cpu', vram') = op_sta   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (STX addmod) (cpu,vram) = let (cpu', vram') = op_stx   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (STY addmod) (cpu,vram) = let (cpu', vram') = op_sty   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TAX addmod) (cpu,vram) = let (cpu', vram') = (op_tax           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TAY addmod) (cpu,vram) = let (cpu', vram') = (op_tay           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TSX addmod) (cpu,vram) = let (cpu', vram') = (op_tsx           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TXA addmod) (cpu,vram) = let (cpu', vram') = (op_txa           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TXS addmod) (cpu,vram) = let (cpu', vram') = (op_txs           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
+    execOpcode (TYA addmod) (cpu,vram) = let (cpu', vram') = (op_tya           cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
 
     
     setNegative :: Word8 -> Bool
@@ -252,11 +323,11 @@ module Parse where
     setCarry :: Word16 -> Bool
     setCarry w = (w .&. 0x100) == 0x100
             
-    op_adc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_adc (ADC a) (cpu,vram) = mathOperation a ((+)) (carry) (cpu,vram)
+    op_adc :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_adc a (cpu,vram) = mathOperation a ((+)) (carry) (cpu,vram)
 
-    op_sbc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_sbc (SBC a) (cpu,vram) = mathOperation a ((-)) (not . carry) (cpu,vram)
+    op_sbc :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_sbc a (cpu,vram) = mathOperation a ((-)) (not . carry) (cpu,vram)
 
 
     mathOperation :: AddressMode -> (Word16 -> Word16 -> Word16) -> (Flags -> Bool) -> (Cpu,VRam) -> (Cpu,VRam)
@@ -299,16 +370,16 @@ module Parse where
     op_sed cpu =  let flags = processorStatus cpu in  setFlags cpu (flags {decimal=True})
 
     -- Store Register
-    op_sta :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_sta (STA a) (cpu,vram) = 
+    op_sta :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_sta a (cpu,vram) = 
         let 
             address = fromJust $ translateAddressMode a (cpu,vram) 
             regA = registerA cpu
         in
             (cpu,VR.write vram address regA)
 
-    op_stx :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_stx (STX a) (cpu,vram) = 
+    op_stx :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_stx a (cpu,vram) = 
         let 
             address = fromJust $ translateAddressMode a (cpu,vram) 
             regX = registerX cpu
@@ -316,8 +387,8 @@ module Parse where
             (cpu,VR.write vram address regX)
 
 
-    op_sty :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_sty (STY a) (cpu,vram) = 
+    op_sty :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_sty a (cpu,vram) = 
         let 
             address = fromJust $ translateAddressMode a (cpu,vram) 
             regY = registerY cpu
@@ -436,8 +507,8 @@ module Parse where
             cpu{registerY=newY, processorStatus=flags}
     
 
-    op_dec :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_dec (DEC x) (cpu,vram) = 
+    op_dec :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_dec x (cpu,vram) = 
         let 
             address = fromJust $ translateAddressMode x (cpu,vram)
             mem = (fromJust $ readAddressMode x (cpu,vram)) - 1
@@ -446,8 +517,8 @@ module Parse where
             (cpu{processorStatus=flags},VR.write vram address mem)
 
             
-    op_inc :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_inc (INC x) (cpu,vram) = 
+    op_inc :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_inc x (cpu,vram) = 
         let 
             address = fromJust $ translateAddressMode x (cpu,vram)
             mem = (fromJust $ readAddressMode x (cpu,vram)) + 1
@@ -455,14 +526,14 @@ module Parse where
         in
             (cpu{processorStatus=flags},VR.write vram address mem)
 
-    op_cmp :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_cmp (CMP x) (cpu,vram) = compareRegister registerA x (cpu,vram)
+    op_cmp :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_cmp x (cpu,vram) = compareRegister registerA x (cpu,vram)
 
-    op_cpx :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_cpx (CPX x) (cpu,vram) = compareRegister registerX x (cpu,vram)
+    op_cpx :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_cpx x (cpu,vram) = compareRegister registerX x (cpu,vram)
 
-    op_cpy :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_cpy (CPY x) (cpu,vram) = compareRegister registerY x (cpu,vram)
+    op_cpy :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_cpy x (cpu,vram) = compareRegister registerY x (cpu,vram)
 
    
     compareRegister :: (Cpu -> Word8) -> AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
@@ -477,14 +548,14 @@ module Parse where
         in
             (cpu{processorStatus=flags},vram)
 
-    op_and :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_and (AND x) (cpu,vram) = logicalAcumulator (.&.) x (cpu,vram)
+    op_and :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_and x (cpu,vram) = logicalAcumulator (.&.) x (cpu,vram)
 
-    op_ora :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_ora (ORA x) (cpu,vram) = logicalAcumulator (.|.) x (cpu,vram)
+    op_ora :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_ora x (cpu,vram) = logicalAcumulator (.|.) x (cpu,vram)
 
-    op_eor :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_eor (EOR x) (cpu,vram) = logicalAcumulator (xor) x (cpu,vram)
+    op_eor :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_eor x (cpu,vram) = logicalAcumulator (xor) x (cpu,vram)
 
     logicalAcumulator :: (Word8 -> Word8 -> Word8) -> AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
     logicalAcumulator f x (cpu,vram) =
@@ -498,8 +569,8 @@ module Parse where
             (cpu{registerA=newA,processorStatus=flags},vram)
 
 
-    op_asl :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_asl (ASL Acc) (cpu,vram) = 
+    op_asl :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_asl (Acc) (cpu,vram) = 
         let
             temp = shift (fromIntegral (registerA cpu) :: Word16) (1)
             newA = fromIntegral (temp .&. 0xFF) :: Word8
@@ -509,7 +580,7 @@ module Parse where
             flags = (processorStatus cpu){negative=n,zero=z,carry=c}
         in
             (cpu{registerA=newA,processorStatus=flags},vram)
-    op_asl (ASL x) (cpu,vram) =
+    op_asl x (cpu,vram) =
         let
             mem = fromJust $ readAddressMode x (cpu,vram)
             temp = shift (fromIntegral mem :: Word16) (1)
@@ -525,8 +596,8 @@ module Parse where
 
 
 
-    op_lsr :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_lsr (LSR Acc) (cpu,vram) = 
+    op_lsr :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_lsr (Acc) (cpu,vram) = 
                 let
                     newA = shift (registerA cpu) (-1)
                     n = setNegative newA
@@ -535,7 +606,7 @@ module Parse where
                     flags = (processorStatus cpu){negative=n,zero=z,carry=c}
                 in
                     (cpu{registerA=newA,processorStatus=flags},vram)
-    op_lsr (LSR x) (cpu,vram) =
+    op_lsr x (cpu,vram) =
                 let
                     mem = fromJust $ readAddressMode x (cpu,vram)
                     new = shift mem (-1)
@@ -549,8 +620,8 @@ module Parse where
                     (cpu{processorStatus=flags},vram')
     
     
-    op_rol :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_rol (ROL Acc) (cpu,vram) = 
+    op_rol :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_rol (Acc) (cpu,vram) = 
         let 
             c_old = fromIntegral $ fromEnum (carry (processorStatus cpu)) :: Word16
             temp = c_old .|. (shift (fromIntegral (registerA cpu) :: Word16) (1))
@@ -561,7 +632,7 @@ module Parse where
             flags = (processorStatus cpu){negative=n,zero=z,carry=c}
         in
             (cpu{registerA=newA,processorStatus=flags},vram)
-    op_rol (ROL x) (cpu,vram) = 
+    op_rol x (cpu,vram) = 
         let 
             mem = fromJust $ readAddressMode x (cpu,vram)
             c_old = fromIntegral $ fromEnum (carry (processorStatus cpu)) :: Word16
@@ -578,8 +649,8 @@ module Parse where
 
 
 
-    op_ror :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_ror (ROR Acc) (cpu,vram) = 
+    op_ror :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_ror (Acc) (cpu,vram) = 
         let 
             a = registerA cpu
             c_old = if carry (processorStatus cpu) then 0x80 else 0x0
@@ -590,7 +661,7 @@ module Parse where
             flags = (processorStatus cpu){negative=n,zero=z,carry=c}
         in
             (cpu{registerA=newA,processorStatus=flags},vram)
-    op_ror (ROR x) (cpu,vram) = 
+    op_ror x (cpu,vram) = 
         let 
             mem = fromJust $ readAddressMode x (cpu,vram)
             c_old = if carry (processorStatus cpu) then 0x80 else 0x0
@@ -604,8 +675,8 @@ module Parse where
         in
             (cpu{processorStatus=flags},vram')
 
-    op_bit :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_bit (BIT x) (cpu,vram) = 
+    op_bit :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_bit x (cpu,vram) = 
         let
             mem = fromJust $ readAddressMode x (cpu,vram)
             v = mem .&. 0x40 == 0x40
@@ -629,41 +700,40 @@ module Parse where
         let
             flags = processorStatus cpu
             pc = programCounter cpu
-            newPC = if (f flags) == b then offsetBranch pc address 
-                 else pc
+            newPC = if (f flags) == b then offsetBranch pc address else pc
         in
             (cpu{programCounter=newPC})
 
 
-    op_bpl :: Opcode -> Cpu -> Cpu
-    op_bpl (BPL x) cpu = branch x negative False cpu
+    op_bpl :: AddressMode -> Cpu -> Cpu
+    op_bpl x cpu = branch x negative False cpu
 
-    op_bmi :: Opcode -> Cpu -> Cpu
-    op_bmi (BMI x) cpu = branch x negative True cpu
+    op_bmi :: AddressMode -> Cpu -> Cpu
+    op_bmi x cpu = branch x negative True cpu
 
-    op_bvc :: Opcode -> Cpu -> Cpu
-    op_bvc (BVC x) cpu = branch x overflow False cpu
+    op_bvc :: AddressMode -> Cpu -> Cpu
+    op_bvc x cpu = branch x overflow False cpu
 
-    op_bvs :: Opcode -> Cpu -> Cpu
-    op_bvs (BVS x) cpu = branch x overflow True cpu
+    op_bvs :: AddressMode -> Cpu -> Cpu
+    op_bvs x cpu = branch x overflow True cpu
 
-    op_bcc :: Opcode -> Cpu -> Cpu
-    op_bcc (BCC x) cpu = branch x carry False cpu
+    op_bcc :: AddressMode -> Cpu -> Cpu
+    op_bcc x cpu = branch x carry False cpu
 
-    op_bcs :: Opcode -> Cpu -> Cpu
-    op_bcs (BCS x) cpu = branch x carry True cpu
+    op_bcs :: AddressMode -> Cpu -> Cpu
+    op_bcs x cpu = branch x carry True cpu
 
-    op_bne :: Opcode -> Cpu -> Cpu
-    op_bne (BNE x) cpu = branch x zero False cpu
+    op_bne :: AddressMode -> Cpu -> Cpu
+    op_bne x cpu = branch x zero False cpu
 
-    op_beq :: Opcode -> Cpu -> Cpu
-    op_beq (BEQ x) cpu = branch x zero True cpu
+    op_beq :: AddressMode -> Cpu -> Cpu
+    op_beq x cpu = branch x zero True cpu
 
     -- Jumps
 
-    op_jmp :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_jmp (JMP (Abs address)) (cpu,vram) = (cpu{programCounter=address},vram)
-    op_jmp (JMP (Ind address)) (cpu,vram) = 
+    op_jmp :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_jmp (Abs address) (cpu,vram) = (cpu{programCounter=address},vram)
+    op_jmp (Ind address) (cpu,vram) = 
         let
             (a_lower,a_upper) = getWord8 address
             lower = VR.read vram address
@@ -672,8 +742,8 @@ module Parse where
             (cpu{programCounter=getWord16 upper lower},vram)
 
     
-    op_jsr :: Opcode -> (Cpu,VRam) -> (Cpu,VRam)
-    op_jsr (JSR (Abs a)) (cpu,vram) = 
+    op_jsr :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_jsr (Abs a) (cpu,vram) = 
         let 
             (lower,upper) = getWord8 $ (programCounter cpu) + 2
             (cpu',vram')= push upper (cpu,vram)
@@ -700,7 +770,7 @@ module Parse where
             flags = processorStatus cpu1
             (cpu2,vram2) = op_php (cpu1{processorStatus=flags{Flags.break=True}},vram1)
         in
-            op_jmp (JMP (Ind 0xFFFE)) (cpu2{processorStatus=flags{interrupt=True,Flags.break=True}},vram2)
+            op_jmp (Ind 0xFFFE) (cpu2{processorStatus=flags{interrupt=True,Flags.break=True}},vram2)
 
     op_rti :: (Cpu,VRam) -> (Cpu,VRam)
     op_rti (cpu,vram) = 
@@ -730,3 +800,36 @@ module Parse where
         in
             (value,(cpu{stackPointer=sp},vram))
             
+
+    op_lda :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_lda a (cpu,vram) = 
+        let
+            new = fromJust $ readAddressMode a (cpu,vram)
+            n = setNegative new
+            z = setZero new
+            flags = (processorStatus cpu){negative=n,zero=z}
+        in 
+            (cpu{registerA=new,processorStatus=flags},vram)
+
+    op_ldx :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_ldx a (cpu,vram) = 
+        let
+            new = fromJust $ readAddressMode a (cpu,vram)
+            n = setNegative new
+            z = setZero new
+            flags = (processorStatus cpu){negative=n,zero=z}
+        in 
+            (cpu{registerX=new,processorStatus=flags},vram)
+
+    op_ldy :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_ldy a (cpu,vram) = 
+        let
+            new = fromJust $ readAddressMode a (cpu,vram)
+            n = setNegative new
+            z = setZero new
+            flags = (processorStatus cpu){negative=n,zero=z}
+        in 
+            (cpu{registerY=new,processorStatus=flags},vram)
+   
+
+    

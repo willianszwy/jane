@@ -18,6 +18,8 @@ module Opcode where
                         | InX Word8
                         | InY Word8
                         deriving (Eq)
+
+    
     
     instance Show AddressMode where
         show (None) = ""
