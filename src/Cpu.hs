@@ -29,10 +29,3 @@ module Cpu where
 
     setFlags :: Cpu -> Flags -> Cpu
     setFlags cpu flags = cpu {processorStatus=flags}
-
-    -- runCPU :: VRam -> VRam
-    -- runCPU cpu vram = 
-    --   where
-    --        nextOpcode = parseChunk $ getChunk (programCounter cpu) vram
-
-    

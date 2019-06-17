@@ -12,7 +12,7 @@ module Parse where
     data Chunk = Empty | Chunk { code :: Word8, lower :: Word8, upper :: Word8 } deriving (Eq,Show)
 
     getWord16 :: Word8 -> Word8 -> Word16 
-    getWord16 upper lower = ( shift (fromIntegral upper) 8) .|. (fromIntegral lower)
+    getWord16 upper lower = (shift (fromIntegral upper) 8) .|. (fromIntegral lower)
 
     getWord8 :: Word16 -> (Word8, Word8)
     getWord8 x = ( fromIntegral (x .&. 0xFF), fromIntegral $ (x .&. 0xFF00) `shiftR` 8 )
@@ -187,7 +187,7 @@ module Parse where
             0xF9 -> SBC (AbY (getWord16FromChunk chunk)) 
             0xFD -> SBC (AbX (getWord16FromChunk chunk)) 
             0xFE -> INC (AbX (getWord16FromChunk chunk))
-            x ->  error $ "codigo nao cadastrado: " ++ show x
+            x ->  NOP None
 
     readAddressMode :: AddressMode -> (Cpu,VRam) -> Maybe Word8
     readAddressMode a (cpu,vram) = 
@@ -286,7 +286,7 @@ module Parse where
     execOpcode (LDX addmod) (cpu,vram) = let (cpu', vram') = op_ldx   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
     execOpcode (LDY addmod) (cpu,vram) = let (cpu', vram') = op_ldy   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
     execOpcode (LSR addmod) (cpu,vram) = let (cpu', vram') = op_lsr   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
-    execOpcode (NOP addmod) (cpu,vram) = (cpu, vram)
+    execOpcode (NOP addmod) (cpu,vram) = (nextOpcode (Rel 0x0) cpu, vram)
     execOpcode (ORA addmod) (cpu,vram) = let (cpu', vram') = op_ora   addmod  (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
     execOpcode (PHA addmod) (cpu,vram) = let (cpu', vram') = op_pha           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
     execOpcode (PHP addmod) (cpu,vram) = let (cpu', vram') = op_php           (cpu,vram) in ( nextOpcode addmod cpu', vram' ) 
@@ -668,7 +668,7 @@ module Parse where
             new = c_old .|. (shift mem (-1))
             n = setNegative new
             z = setZero new
-            c = if mem .&. 0x1 == 1 then True else False
+            c = mem .&. 0x1 == 1 
             flags = (processorStatus cpu){negative=n,zero=z,carry=c}
             address = fromJust $ translateAddressMode x (cpu,vram)
             vram' = VR.write vram address new
@@ -700,7 +700,7 @@ module Parse where
         let
             flags = processorStatus cpu
             pc = programCounter cpu
-            newPC = if (f flags) == b then offsetBranch pc address else pc
+            newPC = if (f flags) == b then offsetBranch pc address else pc + 2
         in
             (cpu{programCounter=newPC})
 
@@ -811,7 +811,7 @@ module Parse where
         in 
             (cpu{registerA=new,processorStatus=flags},vram)
 
-    op_ldx :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam)
+    op_ldx :: AddressMode -> (Cpu,VRam) -> (Cpu,VRam) 
     op_ldx a (cpu,vram) = 
         let
             new = fromJust $ readAddressMode a (cpu,vram)

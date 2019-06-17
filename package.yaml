@@ -19,6 +19,8 @@ dependencies:
 - mtl
 - containers
 - vector
+- sdl2
+- linear
 
 library:
   source-dirs: src

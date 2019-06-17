@@ -28,10 +28,10 @@ module ParseSpec where
     spec :: Spec
     spec =  do
         describe "Parse.setNegative" $ do
-            it "returns True when given a negative number input" $ do
+            it "returns True when given a negative number input" $ 
                 setNegative 0xFF `shouldBe` True
         
-            it "returns False when given a positive number input" $ do 
+            it "returns False when given a positive number input" $ 
                 setNegative 0x7F `shouldBe` False
         
         describe "Parse.setZero" $ do 
@@ -61,44 +61,44 @@ module ParseSpec where
             it "returns True when given a input carry flag on unsigned operations" $ 
                 setCarry (0xFF + 0xFF) `shouldBe` True
 
-        describe "Parse.getWord16" $ do
-            it "returns a Word16 giving two Word8" $ do
+        describe "Parse.getWord16" $ 
+            it "returns a Word16 giving two Word8" $ 
                 getWord16 0xFF 0xFF `shouldBe` (0xFFFF :: Word16)
 
-        describe "Parse.getWord8" $ do
-            it "returns two Word8 from one Word16 (lower,upper)" $ do
+        describe "Parse.getWord8" $ 
+            it "returns two Word8 from one Word16 (lower,upper)" $ 
                 getWord8 0xFFAA `shouldBe` (0xAA :: Word8, 0xFF :: Word8)
 
-        describe "Parse.getWord16FromChunk" $ do
-            it "returns a Word16 from a Chunk" $ do
-                getWord16FromChunk fakeChunk { upper = 0x11, lower = 0x22} `shouldBe` (0x1122) 
+        describe "Parse.getWord16FromChunk" $ 
+            it "returns a Word16 from a Chunk" $ 
+                getWord16FromChunk fakeChunk { upper = 0x11, lower = 0x22} `shouldBe` 0x1122
         
-        describe "Parse.getWord16FromChunk" $ do
-            it "throws an exception if Chunk is empty" $ do
+        describe "Parse.getWord16FromChunk" $ 
+            it "throws an exception if Chunk is empty" $ 
                 evaluate ( getWord16FromChunk Empty) `shouldThrow` anyErrorCall
 
-        describe "Parse.getChunk" $ do   
-            it "returns a Chunk giving a address" $ do
+        describe "Parse.getChunk" $ 
+            it "returns a Chunk giving a address" $ 
                 getChunk 0x10 getFakeVRam `shouldBe` fakeChunk 
 
         describe "Parse.parseChunk" $ do   
             it "returns a Opcode giving a chunk" $ do
-                parseChunk fakeChunk {code=0x01} `shouldBe` (ORA (InX (0xFF)))
-                parseChunk fakeChunk {code=0x00} `shouldBe` (BRK None)
-            it "throws an exception if Opcode is invalid " $ do
-                    evaluate ( parseChunk fakeChunk {code=0x02}) `shouldThrow` anyException
+                parseChunk fakeChunk {code=0x01} `shouldBe` ORA (InX 0xFF)
+                parseChunk fakeChunk {code=0x00} `shouldBe` BRK None
+            it "if Opcode is invalid return NOP None " $ 
+                parseChunk fakeChunk {code=0x02} `shouldBe` NOP None
 
         describe "Parse.readAddressMode" $ do
-            it "returns Nothing if AddressMode is None" $ do
-                readAddressMode (None) (getFakeCpu,getFakeVRam) `shouldBe` Nothing
+            it "returns Nothing if AddressMode is None" $ 
+                readAddressMode None (getFakeCpu,getFakeVRam) `shouldBe` Nothing
 
-            it "returns RegisterA if AddressMode is Acc" $ do
-                readAddressMode (Acc) (getFakeCpu {registerA = 0xAA},getFakeVRam) `shouldBe` Just 0xAA
+            it "returns RegisterA if AddressMode is Acc" $ 
+                readAddressMode Acc (getFakeCpu {registerA = 0xAA},getFakeVRam) `shouldBe` Just 0xAA
             
-            it "returns the immediate value of Imm x" $ do
+            it "returns the immediate value of Imm x" $ 
                 readAddressMode (Imm 0xBB) (getFakeCpu,getFakeVRam) `shouldBe` Just 0xBB
 
-            it "returns the data in the giving zero page address" $ do
+            it "returns the data in the giving zero page address" $ 
                 readAddressMode (Zpg 0x01) (getFakeCpu,getFakeVRam) `shouldBe` Just 0xFF
 
             it "returns the data in the giving zero page address + Register X" $ do
@@ -133,10 +133,10 @@ module ParseSpec where
                 let vram2 = VRam.write vram1 0x0704 0x0B
                 readAddressMode (InY 0x01) (getFakeCpu {registerY = 0x01},vram2) `shouldBe` Just 0x0B
 
-            it "throws an error if Address Mode is invalid " $ do
+            it "throws an error if Address Mode is invalid " $ 
                 evaluate ( readAddressMode (Ind 0x0001) (getFakeCpu,getFakeVRam) ) `shouldThrow` anyErrorCall
 
-        describe "Parse.op_adc" $ do
+        describe "Parse.op_adc" $ 
             it "Add Memory to Accumulator with Carry" $ do
                 let flags = processorStatus getFakeCpu
                 op_adc (Imm 0xFF) (getFakeCpu { registerA = 0xFF},getFakeVRam) `shouldBe` 
@@ -149,58 +149,58 @@ module ParseSpec where
                 op_sbc (Imm 0x01) (getFakeCpu{registerA=0x02},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA=0x00,processorStatus=flags},getFakeVRam)
 
-        describe "Parse.op_clc" $ do
+        describe "Parse.op_clc" $ 
             it "cleans the carry flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_clc getFakeCpu {processorStatus = flags { carry=False}}
                   `shouldBe` getFakeCpu {processorStatus = flags { carry=False}}
 
-        describe "Parse.op_sec" $ do
+        describe "Parse.op_sec" $ 
             it "set the carry flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_sec getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { carry=True}}
 
-        describe "Parse.op_cli" $ do
+        describe "Parse.op_cli" $ 
             it "cleans the interrupt flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_cli getFakeCpu {processorStatus = flags { interrupt=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { interrupt=False}}
         
-        describe "Parse.op_sei" $ do
+        describe "Parse.op_sei" $ 
             it "set the interrupt flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_sei getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { interrupt=True}}
 
-        describe "Parse.op_clv" $ do
+        describe "Parse.op_clv" $ 
             it "cleans the overflow flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_clv getFakeCpu {processorStatus = flags { overflow=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { overflow=False}}
 
-        describe "Parse.op_cld" $ do
+        describe "Parse.op_cld" $ 
             it "cleans the decimal flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_cld getFakeCpu {processorStatus = flags { decimal=False}}
                     `shouldBe` getFakeCpu {processorStatus = flags { decimal=False}}
                     
-        describe "Parse.op_sed" $ do
+        describe "Parse.op_sed" $ 
             it "set the decimal flag" $ do
                 let flags = processorStatus getFakeCpu
                 op_sed getFakeCpu `shouldBe` getFakeCpu {processorStatus = flags { decimal=True}}
 
-        describe "Parse.op_sta" $ do
+        describe "Parse.op_sta" $ 
             it "Store Accumulator in Memory" $ do
                 let vram = VRam.write getFakeVRam 0xAA 0xA1
                 op_sta (Zpg 0xAA) (getFakeCpu {registerA = 0xA1},getFakeVRam) 
                     `shouldBe` (getFakeCpu {registerA = 0xA1},vram)
 
-        describe "Parse.op_stx" $ do
+        describe "Parse.op_stx" $ 
             it "Store Index X in Memory" $ do
                     let vram = VRam.write getFakeVRam 0xBB 0xA2
                     op_stx (Zpg 0xBB) (getFakeCpu {registerX = 0xA2},getFakeVRam) 
                         `shouldBe` (getFakeCpu {registerX = 0xA2},vram)
 
-        describe "Parse.op_sty" $ do
+        describe "Parse.op_sty" $ 
             it "Store Index Y in Memory" $ do
                     let vram = VRam.write getFakeVRam 0xCC 0xA3
                     op_sty (Zpg 0xCC) (getFakeCpu {registerY = 0xA3},getFakeVRam) 
@@ -208,13 +208,13 @@ module ParseSpec where
 
         -- Stack
 
-        describe "Parse.op_txs" $ do
-            it "Transfer X to Stack Pointer" $ do
+        describe "Parse.op_txs" $ 
+            it "Transfer X to Stack Pointer" $ 
                 op_txs (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
                     `shouldBe` getFakeCpu {registerX = 0xBB, stackPointer = 0xBB}
         
-        describe "Parse.op_tsx" $ do
-            it "Transfer Stack Pointer to X" $ do
+        describe "Parse.op_tsx" $ 
+            it "Transfer Stack Pointer to X" $ 
                 op_tsx (getFakeCpu {registerX = 0xBB, stackPointer = 0xFF})
                     `shouldBe` getFakeCpu {registerX = 0xFF, stackPointer = 0xFF}
                         
@@ -242,7 +242,7 @@ module ParseSpec where
                 op_pla (getFakeCpu{registerA = 0x00, stackPointer = 0xFF},vram) 
                     `shouldBe` (getFakeCpu{registerA = 0xD1, stackPointer = 0x00, processorStatus=flags},vram)
        
-        describe "Parse.op_php" $ do
+        describe "Parse.op_php" $ 
             it "Push Processor Status to Stack" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=True}
                 let status = compact flags
@@ -250,7 +250,7 @@ module ParseSpec where
                 op_php (getFakeCpu{processorStatus=flags},getFakeVRam)
                     `shouldBe` (getFakeCpu{processorStatus=flags,stackPointer = 0xFC},vram)
                         
-        describe "Parse.op_plp" $ do 
+        describe "Parse.op_plp" $ 
             it "Pull Stack to Processor Status" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,interrupt=True}
                 let status = compact flags 
@@ -259,7 +259,7 @@ module ParseSpec where
                     `shouldBe` (getFakeCpu{stackPointer=0xFE,processorStatus=flags},vram)
         
 
-        describe "Parse.op_tax" $ do
+        describe "Parse.op_tax" $ 
             it "Transfer Accumulator to X" $ do
                 let flags = (processorStatus getFakeCpu)
                 op_tax getFakeCpu{registerA=0xBA,registerX=0xBC} 
@@ -267,14 +267,14 @@ module ParseSpec where
                         processorStatus=flags{negative=setNegative 0xBA,zero=setZero 0xBA}}
 
         
-        describe "Parse.op_txa" $ do
+        describe "Parse.op_txa" $ 
             it "Transfer Index X to A" $ do
                 let flags = (processorStatus getFakeCpu)
                 op_txa getFakeCpu{registerA=0xC1,registerX=0xC5} 
                    `shouldBe` getFakeCpu{registerA=0xC5,registerX=0xC5,
                         processorStatus=flags{negative=setNegative 0xC5,zero=setZero 0xC5}}
 
-        describe "Parse.op_dex" $ do
+        describe "Parse.op_dex" $ 
             it "Decrement Index X" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newX = (registerX getFakeCpu) - 1 :: Word8
@@ -282,7 +282,7 @@ module ParseSpec where
                   `shouldBe` getFakeCpu{registerX=newX,
                         processorStatus=flags{negative=setNegative newX,zero=setZero newX}}
     
-        describe "Parse.op_inx" $ do
+        describe "Parse.op_inx" $ 
             it "Increment Index X" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newX = (registerX getFakeCpu) + 1 :: Word8
@@ -291,7 +291,7 @@ module ParseSpec where
                             processorStatus=flags{negative=setNegative newX,zero=setZero newX}}
 
 
-        describe "Parse.op_tay" $ do
+        describe "Parse.op_tay" $ 
             it "Transfer Accumulator to Y" $ do
                 let flags = (processorStatus getFakeCpu)
                 op_tay getFakeCpu{registerA=0xBA,registerY=0xBC} 
@@ -299,14 +299,14 @@ module ParseSpec where
                                 processorStatus=flags{negative=setNegative 0xBA,zero=setZero 0xBA}}
                     
                             
-        describe "Parse.op_tya" $ do
+        describe "Parse.op_tya" $ 
             it "Transfer Index Y to A" $ do
                 let flags = (processorStatus getFakeCpu)
                 op_tya getFakeCpu{registerA=0xC1,registerY=0xC5} 
                         `shouldBe` getFakeCpu{registerA=0xC5,registerY=0xC5,
                                 processorStatus=flags{negative=setNegative 0xC5,zero=setZero 0xC5}}
                     
-        describe "Parse.op_dey" $ do
+        describe "Parse.op_dey" $ 
             it "Decrement Index Y" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newY = (registerY getFakeCpu) - 1 :: Word8
@@ -314,7 +314,7 @@ module ParseSpec where
                         `shouldBe` getFakeCpu{registerY=newY,
                                 processorStatus=flags{negative=setNegative newY,zero=setZero newY}}
                         
-        describe "Parse.op_iny" $ do
+        describe "Parse.op_iny" $ 
             it "Increment Index Y" $ do
                 let flags = (processorStatus getFakeCpu)
                 let newY = (registerY getFakeCpu) + 1 :: Word8
@@ -323,7 +323,7 @@ module ParseSpec where
                                 processorStatus=flags{negative=setNegative newY,zero=setZero newY}}
 
        
-        describe "Parse.op_dec" $ do
+        describe "Parse.op_dec" $ 
             it "Decrement Memory by One" $ do
                 let value = (0x0A :: Word8)
                 let vram = VRam.write getFakeVRam 0xBC value
@@ -332,7 +332,7 @@ module ParseSpec where
                 op_dec (Abs 0x00BC) (getFakeCpu,vram) `shouldBe` (getFakeCpu,vram')
 
 
-        describe "Parse.op_inc" $ do
+        describe "Parse.op_inc" $ 
             it "Increment Memory by One" $ do
                 let value = (0x0B :: Word8)
                 let vram = VRam.write getFakeVRam 0xBD value
@@ -341,28 +341,28 @@ module ParseSpec where
                 op_inc (Abs 0x00BD) (getFakeCpu,vram) `shouldBe` (getFakeCpu,vram')
 
         
-        describe "Parse.op_cmp" $ do
+        describe "Parse.op_cmp" $ 
             it "Compare Memory with Accumulator" $ do
                 let flags = (processorStatus getFakeCpu){negative=True}
                 op_cmp (Imm 0x80) (getFakeCpu{registerA=0x7F},getFakeVRam)
                     `shouldBe` (getFakeCpu{registerA=0x7F,processorStatus=flags},getFakeVRam)
 
 
-        describe "Parse.op_cpx" $ do
+        describe "Parse.op_cpx" $ 
             it "Compare Memory and Index X" $ do
                 let flags = (processorStatus getFakeCpu){negative=True}
                 op_cpx (Imm 0x80) (getFakeCpu{registerX=0x7F},getFakeVRam)
                     `shouldBe` (getFakeCpu{registerX=0x7F,processorStatus=flags},getFakeVRam)
 
                     
-        describe "Parse.op_cpy" $ do
+        describe "Parse.op_cpy" $ 
             it "Compare Memory and Index Y" $ do
                 let flags = (processorStatus getFakeCpu){negative=True}
                 op_cpy (Imm 0x80) (getFakeCpu{registerY=0x7F},getFakeVRam)
                     `shouldBe` (getFakeCpu{registerY=0x7F,processorStatus=flags},getFakeVRam)
 
 
-        describe "Parse.op_and" $ do
+        describe "Parse.op_and" $ 
             it "AND Memory with Accumulator" $ do
                 let res = (0x80 :: Word8) B..&. (0x05 :: Word8)
                 let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
@@ -370,7 +370,7 @@ module ParseSpec where
                     `shouldBe` (getFakeCpu{registerA=res,processorStatus=flags},getFakeVRam)
 
 
-        describe "Parse.op_ora" $ do
+        describe "Parse.op_ora" $ 
             it "OR Memory with Accumulator" $ do
                 let res = (0x80 :: Word8) B..|. (0x05 :: Word8)
                 let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
@@ -378,7 +378,7 @@ module ParseSpec where
                     `shouldBe` (getFakeCpu{registerA=res,processorStatus=flags},getFakeVRam)
 
 
-        describe "Parse.op_eor" $ do
+        describe "Parse.op_eor" $ 
             it "XOR Memory with Accumulator" $ do
                 let res = B.xor (0x80 :: Word8) (0x05 :: Word8)
                 let flags = (processorStatus getFakeCpu){negative=setNegative res,zero=setZero res}
@@ -387,8 +387,8 @@ module ParseSpec where
             
        
         describe "Parse.op_asl" $ do
-            it "Shift Left One Bit (Accumulator)" $ do
-                op_asl (Acc) (getFakeCpu{registerA=0x1},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x2},getFakeVRam)
+            it "Shift Left One Bit (Accumulator)" $ 
+                op_asl Acc (getFakeCpu{registerA=0x1},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x2},getFakeVRam)
 
             it "Shift Left One Bit (Memory)" $ do
                 let vram = VRam.write getFakeVRam 0xBD 0x01
@@ -398,8 +398,8 @@ module ParseSpec where
 
 
         describe "Parse.op_lsr" $ do
-            it "Shift Right One Bit (Accumulator)" $ do
-                op_lsr (Acc) (getFakeCpu{registerA=0x2},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x1},getFakeVRam)
+            it "Shift Right One Bit (Accumulator)" $ 
+                op_lsr Acc (getFakeCpu{registerA=0x2},getFakeVRam) `shouldBe` (getFakeCpu{registerA=0x1},getFakeVRam)
             
             it "Shift Right One Bit (Memory)" $ do
                 let vram = VRam.write getFakeVRam 0xBD 0x02
@@ -411,12 +411,12 @@ module ParseSpec where
         describe "Parse.op_rol" $ do
             it "Rotate One Bit Left (Accumulator) with Carry True" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=True}
-                op_rol (Acc) (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
+                op_rol Acc (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam)
 
             it "Rotate One Bit Left (Accumulator) with Carry False" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=True}
-                op_rol (Acc) (getFakeCpu{registerA=0xFF},getFakeVRam) 
+                op_rol Acc (getFakeCpu{registerA=0xFF},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA=0xFE,processorStatus=flags},getFakeVRam)
 
             it "Rotate One Bit Left (Memory) with Carry True" $ do
@@ -438,12 +438,12 @@ module ParseSpec where
         describe "Parse.op_ror" $ do
             it "Rotate One Bit Right (Memory or Accumulator) with Carry True" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=True}
-                op_ror (Acc) (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
+                op_ror Acc (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA=0xFF,processorStatus=flags},getFakeVRam)
             
             it "Rotate One Bit Right (Memory or Accumulator) with Carry False" $ do
                 let flags = (processorStatus getFakeCpu){carry=True,negative=False}
-                op_ror (Acc) (getFakeCpu{registerA=0xFF},getFakeVRam) 
+                op_ror Acc (getFakeCpu{registerA=0xFF},getFakeVRam) 
                     `shouldBe` (getFakeCpu{registerA=0x7F,processorStatus=flags},getFakeVRam)
 
             it "Rotate One Bit Right (Memory or Accumulator) with Carry True" $ do
@@ -461,121 +461,121 @@ module ParseSpec where
                     `shouldBe` (getFakeCpu{processorStatus=flags},vram')
                          
 
-        describe "Parse.op_bit" $ do
+        describe "Parse.op_bit" $ 
             it "Test Bits in Memory with Accumulator" $ do
                 let vram = VRam.write getFakeVRam 0x0C 0xC2
                 let flags = (processorStatus getFakeCpu){overflow=True,negative=True,zero=False}
                 op_bit (Zpg 0x0C) (getFakeCpu{registerA=0xA1},vram) `shouldBe` (getFakeCpu{registerA=0xA1,processorStatus=flags},vram)
 
-        describe "Parse.getSignedWord8" $ do
+        describe "Parse.getSignedWord8" $ 
             it "Calculate 2's compliments of a Word8" $ do
                 getSignedWord8 0xFF `shouldBe` 0x01
                 getSignedWord8 0x80 `shouldBe` 128
 
 
-        describe "Parse.offsetBranch" $ do
-            it "Returns de new Program Counter address giving a offset" $ do
+        describe "Parse.offsetBranch" $ 
+            it "Returns de new Program Counter address giving a offset" $ 
                 offsetBranch 0x0004 0x02 `shouldBe` 0x0008
 
-        describe "Parse.op_bcc" $ do
+        describe "Parse.op_bcc" $ 
             it "Branch on carry clear | Carry = False " $ do
                 let pc = programCounter getFakeCpu
                 op_bcc (Rel 0x02) getFakeCpu 
                     `shouldBe` (getFakeCpu{programCounter = pc + 4})
         
-        describe "Parse.op_bcc" $ do
+        describe "Parse.op_bcc" $ 
             it "Branch on carry clear | Carry = True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){carry=True}
                 op_bcc (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                        `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc})
+                        `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2})
 
 
-        describe "Parse.op_bcs" $ do
+        describe "Parse.op_bcs" $ 
             it "Branch on carry set | Carry = True " $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){carry=True}
                 op_bcs (Rel 0x02) getFakeCpu{processorStatus=flags}
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4})
                         
-        describe "Parse.op_bcs" $ do
+        describe "Parse.op_bcs" $ 
             it "Branch on carry set | Carry = False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){carry=False}
                 op_bcs (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc})
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2})
 
-        describe "Parse.op_beq" $ do
+        describe "Parse.op_beq" $ 
             it "Branch on equal Zero True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){zero=True}
                 op_beq (Rel 0x02) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4})
 
-        describe "Parse.op_beq" $ do
+        describe "Parse.op_beq" $ 
             it "Branch on equal Zero False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){zero=False}
                 op_beq (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc })
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2 })
 
-        describe "Parse.op_bmi" $ do
+        describe "Parse.op_bmi" $ 
             it "Branch on Minus Negative True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){negative=True}
                 op_bmi (Rel 0x02) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
 
-        describe "Parse.op_bmi" $ do
+        describe "Parse.op_bmi" $ 
             it "Branch on Minus Negative False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){negative=False}
                 op_bmi (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2  })
 
 
-        describe "Parse.op_bne" $ do
+        describe "Parse.op_bne" $ 
             it "Branch on not Equal Zero False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){zero=False}
                 op_bne (Rel 0x02) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
             
-        describe "Parse.op_bne" $ do
+        describe "Parse.op_bne" $ 
             it "Branch on not Equal Zero True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){zero=True}
                 op_bne (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2 })
 
-        describe "Parse.op_bpl" $ do
+        describe "Parse.op_bpl" $ 
             it "Branch on Plus negative False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){negative=False}
                 op_bpl (Rel 0x02) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
                         
-        describe "Parse.op_bpl" $ do
+        describe "Parse.op_bpl" $ 
             it "Branch on not Plus negative True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){negative=True}
                 op_bpl (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2 })
 
 
-        describe "Parse.op_bvc" $ do
+        describe "Parse.op_bvc" $ 
             it "Branch on Overflow False" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){overflow=False}
                 op_bvc (Rel 0x02) getFakeCpu{processorStatus=flags} 
                     `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 4 })
                                     
-        describe "Parse.op_bvc" $ do
+        describe "Parse.op_bvc" $ 
             it "Branch on Overflow True" $ do
                 let pc = programCounter getFakeCpu
                 let flags = (processorStatus getFakeCpu){overflow=True}
                 op_bvc (Rel 0x02) getFakeCpu{processorStatus=flags} 
-                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc  })
+                    `shouldBe` (getFakeCpu{processorStatus=flags,programCounter = pc + 2 })
 
         describe "Parse.op_jmp" $ do
             it "Jump to New Location Indirect" $ do
@@ -584,12 +584,12 @@ module ParseSpec where
                 op_jmp (Ind 0x01FF) (getFakeCpu,vram') 
                     `shouldBe` (getFakeCpu{programCounter=0x0280},vram')
 
-            it "Jump to New Location Absolute" $ do
+            it "Jump to New Location Absolute" $ 
                 op_jmp (Abs 0x01FF) (getFakeCpu,getFakeVRam) 
                     `shouldBe` (getFakeCpu{programCounter=0x01FF},getFakeVRam)
 
 
-        describe "Parse.op_jsr" $ do
+        describe "Parse.op_jsr" $ 
             it "Jump to New Location Saving Return Address" $ do
                 let vram = VRam.write getFakeVRam 0x01FD 0x01
                 let vram' = VRam.write vram 0x01FC 0x02
@@ -597,7 +597,7 @@ module ParseSpec where
                         (getFakeCpu{programCounter=0x0110,stackPointer=0xFB},vram')
 
 
-        describe "Parse.op_rts" $ do
+        describe "Parse.op_rts" $ 
             it "Return from Subroutine" $ do
                 let pc = programCounter getFakeCpu
                 let (cpu,vram) = op_jsr (Abs 0x0100) (getFakeCpu,getFakeVRam)
@@ -605,21 +605,21 @@ module ParseSpec where
             
             
 
-        describe "Parse.push" $ do
+        describe "Parse.push" $ 
             it "Push data on stack" $ do
                 let sp = stackPointer getFakeCpu
                 let vram = VRam.write getFakeVRam (getWord16 0x01 sp) 0x10
                 push 0x10 (getFakeCpu, getFakeVRam) `shouldBe` (getFakeCpu{stackPointer=sp - 1},vram)
 
 
-        describe "Parse.pull" $ do
+        describe "Parse.pull" $ 
             it "Pull data from stack" $ do
                 let (cpu,vram) =  push 0x10 (getFakeCpu, getFakeVRam)
                 let sp = stackPointer cpu
                 pull (cpu,vram) `shouldBe` (0x10,(cpu{stackPointer= sp + 1},vram))
 
 
-        describe "Parse.brk" $ do
+        describe "Parse.brk" $ 
             it "Force Break" $ do
                 let vram = VRam.init {
                     ram = RAM (V.replicate 0x800 0xFF),
@@ -638,7 +638,7 @@ module ParseSpec where
                     `shouldBe` (getFakeCpu{processorStatus=flags{Flags.break=True,interrupt=True}
                                 ,stackPointer=sp,programCounter=0x0}, vram3)
         
-        describe "Parse.rti" $ do
+        describe "Parse.rti" $ 
             it "Return from Interrupt" $ do
                 let flags = processorStatus getFakeCpu
                 let sp = stackPointer getFakeCpu - 3
